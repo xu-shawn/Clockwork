@@ -1,0 +1,23 @@
+name: Compilation
+
+on:
+  workflow_call:
+
+jobs:
+  compilation:
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        compiler: [g++, clang++]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Check compiler
+        run: ${{ matrix.compiler }} -v
+
+      - name: Build
+        run: CXX=${{ matrix.compiler }} make
