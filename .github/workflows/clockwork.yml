@@ -1,0 +1,13 @@
+name: Clockwork
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  Compilation:
+    uses: ./.github/workflows/compilation.yml
