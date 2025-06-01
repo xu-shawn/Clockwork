@@ -12,6 +12,9 @@ namespace Clockwork {
 struct Square {
     u8 raw;
 
+    constexpr Square(u8 r) :
+        raw{r} {}
+
     static constexpr Square fromFileAndRank(int file, int rank) {
         assert(file >= 0 && file < 8);
         assert(rank >= 0 && rank < 8);
