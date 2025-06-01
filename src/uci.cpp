@@ -17,7 +17,12 @@ void UCIHandler::loop() {
 
         is >> std::skipws >> command;
 
-        if (command == "isready")
+        if (command == "uci")
+        {
+            std::cout << "id Name Clockwork\n";
+            std::cout << "id author The Clockwork community" << std::endl;
+        }
+        else if (command == "isready")
             std::cout << "readyok" << std::endl;
         else if (command == "quit")
             break;
