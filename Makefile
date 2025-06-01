@@ -1,64 +1,36 @@
+CXX ?= clang++
 EXE ?= clockwork
 
-
-# Debug object files
-ifeq ($(strip $(debug)),) # If debug is empty or whitespace only
-	OBJDIR := release
-else
-	OBJDIR := debug
-endif
-
-
-# Source and object files
-SOURCES  := src/main.cpp src/uci.cpp
-BUILDDIR := build
-OBJDIR   := $(BUILDDIR)/$(OBJDIR)
-OBJECTS  := $(patsubst src/%.cpp,$(OBJDIR)/%.o,$(SOURCES))
-
-
-# Compilation flags
-CXX      ?= clang++
-CXXFLAGS := -std=c++20 -Wall -Wextra -Wpedantic -fno-exceptions -fno-rtti $(CXXFLAGS)
-LDFLAGS  := $(LDFLAGS)
-
-
-# Debug flags
-ifeq ($(strip $(debug)),) # If debug is empty or whitespace only
-	CXXFLAGS += -O3 -flto -DNDEBUG
-	LDFLAGS  += -flto
-else
-	CXXFLAGS += -O0 -g
-	LDFLAGS  += -g
-endif
-
-
-# Handle windows exe extensions
 ifeq ($(OS), Windows_NT)
-	SUFFIX := .exe
+    SUFFIX := .exe
+    COPY := copy
+    RM := del
+    RM_DIR := rd /s /q
+    MK_PATH = $(subst /,\,$(1))
 else
-	SUFFIX :=
+    SUFFIX :=
+    COPY := cp
+    RM := rm
+    RM_DIR := rm -rf
+    MK_PATH = $(1)
 endif
 
-EXE := $(EXE)$(SUFFIX)
 
 
-# Rules
-.PHONY: all clean
+EXE := "$(EXE)$(SUFFIX)"
 
-all: $(EXE)
+.PHONY: all release debug clean
 
+all: release
 
+release:
+	cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=$(CXX) -B build-release -S . && cmake --build build-release -j
+	$(COPY) $(call MK_PATH,"build-release/clockwork$(SUFFIX)") $(EXE)
 
-$(EXE): $(OBJECTS)
-	$(CXX) $(CXXFLAGS) $^ $(LDFLAGS) -o $@
-
-$(OBJDIR)/%.o: src/%.cpp
-	@mkdir -p $(@D)
-	$(CXX) $(CXXFLAGS) -MMD -MP -c $< -o $@
+debug:
+	cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=$(CXX) -B build-debug -S . && cmake --build build-debug -j
+	$(COPY) $(call MK_PATH,"build-debug/clockwork$(SUFFIX)") $(EXE)
 
 clean:
-	$(RM) -r $(BUILDDIR) $(EXE)
-
-
-# Include generated dependencies
--include $(OBJECTS:.o=.d)
+	-$(RM_DIR) build-debug build-release
+	-$(RM) $(EXE)
