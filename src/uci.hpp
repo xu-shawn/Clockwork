@@ -1,5 +1,4 @@
-#ifndef CLOCKWORK_UCI_HPP
-#define CLOCKWORK_UCI_HPP
+#pragma once
 
 namespace Clockwork::UCI {
 
@@ -9,5 +8,3 @@ class UCIHandler {
 };
 
 }
-
-#endif
