@@ -1,5 +1,6 @@
-CXX ?= clang++
-EXE ?= clockwork
+CXX  ?= clang++
+EXE  ?= clockwork
+ARCH ?= native
 
 
 ifdef MSYSTEM
@@ -25,6 +26,7 @@ else
 	endif
 endif
 
+CMAKE_FLAGS := -DCMAKE_CXX_COMPILER=$(CXX) -DCLOCKWORK_MARCH_TARGET=$(ARCH)
 
 EXE := "$(EXE)$(SUFFIX)"
 
@@ -33,11 +35,11 @@ EXE := "$(EXE)$(SUFFIX)"
 all: release
 
 release:
-	cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=$(CXX) -B build-release -S . && cmake --build build-release -j
+	cmake -DCMAKE_BUILD_TYPE=Release $(CMAKE_FLAGS) -B build-release -S . && cmake --build build-release -j
 	$(COPY) $(call MK_PATH,"build-release/clockwork$(SUFFIX)") $(EXE)
 
 debug:
-	cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=$(CXX) -B build-debug -S . && cmake --build build-debug -j
+	cmake -DCMAKE_BUILD_TYPE=Debug $(CMAKE_FLAGS) -B build-debug -S . && cmake --build build-debug -j
 	$(COPY) $(call MK_PATH,"build-debug/clockwork$(SUFFIX)") $(EXE)
 
 clean:

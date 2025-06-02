@@ -29,7 +29,14 @@ target_link_options(clockwork PRIVATE
         >)
 
 #Optimizations
-target_compile_options(clockwork PRIVATE -march=native)
+set(CLOCKWORK_MARCH_TARGET "native" CACHE STRING "Specify the target architecture for -march (e.g., native, skylake, znver2). Set to OFF or empty to disable.")
+
+if(CLOCKWORK_MARCH_TARGET AND NOT CLOCKWORK_MARCH_TARGET STREQUAL "OFF")
+    message(STATUS "Using -march=${CLOCKWORK_MARCH_TARGET} for optimizations")
+    target_compile_options(clockwork PRIVATE "-march=${CLOCKWORK_MARCH_TARGET}")
+else()
+    message(STATUS "-march flag disabled by user")
+endif()
 
 # LTO
 include(CheckIPOSupported)

@@ -16,12 +16,12 @@ jobs:
           - clang++
     runs-on: ${{ matrix.os }}
     steps:
-      - name: Check out repo
+      - name: Check Out Repo
         uses: actions/checkout@v4
         with:
           persist-credentials: false
 
-      - name: Check compiler
+      - name: Check Compiler
         run: ${{ matrix.compiler }} -v
 
       - name: Build Debug
@@ -46,26 +46,26 @@ jobs:
       run:
         shell: "msys2 {0}"
     steps:
-      - name: Check out repo
+      - name: Check Out Repo
         uses: actions/checkout@v4
         with:
           persist-credentials: false
 
-      - name: Set up MSYS2
+      - name: Set Up MSYS2
         uses: msys2/setup-msys2@v2
         with:
           msystem: ${{ matrix.sys }}
           install: make cmake
           pacboy: toolchain:p
 
-      - name: Check compiler
+      - name: Check Compiler
         run: ${{ matrix.compiler }} -v
 
       - name: Build Debug
         if: matrix.compiler == 'clang++'
         run: make debug CXX=${{ matrix.compiler }}
 
-      - name: Clean build
+      - name: Clean Build
         run: make clean
 
       - name: Build Release

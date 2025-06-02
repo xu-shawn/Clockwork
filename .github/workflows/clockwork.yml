@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - pre-releases
   pull_request:
     branches:
       - main
@@ -11,3 +12,10 @@ on:
 jobs:
   Compilation:
     uses: ./.github/workflows/compilation.yml
+  Prerelease:
+    needs: [Compilation]
+    uses: ./.github/workflows/prerelease.yml
+    secrets:
+      token: ${{ secrets.ACCESS_TOKEN }}
+    permissions:
+      contents: write
