@@ -1,5 +1,7 @@
 #pragma once
 
+#include "util/types.hpp"
+
 namespace Clockwork {
 
 enum class Color {
@@ -7,19 +9,35 @@ enum class Color {
     Black
 };
 
-enum class PieceType {
+constexpr char color_char(Color color) {
+    using enum Color;
+    switch (color) {
+    case White :
+        return 'w';
+    case Black :
+        return 'b';
+    }
+}
+
+constexpr Color invert(Color color) {
+    return static_cast<Color>(static_cast<int>(color) ^ 1);
+}
+
+enum class PieceType : u8 {
+    None,
     Pawn,
     Knight,
     Bishop,
     Rook,
     Queen,
     King,
-    Empty,
 };
 
 constexpr char piece_char(PieceType piece) {
     using enum PieceType;
     switch (piece) {
+    case None :
+        return '.';
     case Pawn :
         return 'p';
     case Knight :
@@ -32,8 +50,6 @@ constexpr char piece_char(PieceType piece) {
         return 'q';
     case King :
         return 'k';
-    case Empty :
-        return '.';
     }
 }
 
