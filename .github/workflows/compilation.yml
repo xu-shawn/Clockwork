@@ -37,7 +37,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           make CXX=${{ matrix.compiler }}
-          make test
+          make CXX=${{ matrix.compiler }} test
 
   windows-compilation:
     strategy:
