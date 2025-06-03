@@ -18,7 +18,7 @@ jobs:
           - x86-64-v4
     runs-on: ubuntu-latest
     steps:
-      - name: Check Out Repo
+      - name: Checkout Repo
         uses: actions/checkout@v4
         with:
           persist-credentials: false
