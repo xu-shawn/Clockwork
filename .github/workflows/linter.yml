@@ -1,0 +1,28 @@
+name: Linter
+
+on:
+  workflow_call:
+    secrets:
+      token:
+        required: true
+
+jobs:
+  cpp-linter:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Run cpp-linter
+        uses: cpp-linter/cpp-linter-action@v2.15.0
+        id: linter
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.token }}
+        with:
+          style: file
+          tidy-checks:
+          files-changed-only: false
+          thread-comments: false
