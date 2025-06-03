@@ -25,17 +25,19 @@ jobs:
         run: ${{ matrix.compiler }} -v
 
       - name: Build Debug
-        run: make debug CXX=${{ matrix.compiler }}
+        run: make debug CXX=${{ matrix.compiler }} ARCH=x86-64-v3
 
       - name: Clean build
         run: make clean
 
       - name: Build Release
-        run: make CXX=${{ matrix.compiler }}
+        run: make CXX=${{ matrix.compiler }} ARCH=x86-64-v3
 
       - name: Test
         if: ${{ matrix.os }} == 'ubuntu-latest'
-        run: make CXX=${{ matrix.compiler }} test
+        run: |
+          make CXX=${{ matrix.compiler }}
+          make test
 
   windows-compilation:
     strategy:
