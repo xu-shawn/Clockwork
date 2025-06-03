@@ -34,7 +34,7 @@ jobs:
         run: make CXX=${{ matrix.compiler }} ARCH=x86-64-v3
 
       - name: Test
-        if: ${{ matrix.os }} == 'ubuntu-latest'
+        if: runner.os == 'Linux'
         run: |
           make CXX=${{ matrix.compiler }}
           make test
