@@ -23,5 +23,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.token }}
         with:
           style: file
+          tidy-checks:
           files-changed-only: false
           thread-comments: false
