@@ -9,12 +9,20 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - ubuntu-latest
-          - macos-latest
+          - runner: ubuntu-latest
+            name: linux
+          - runner: macos-latest
+            name: macos
+        arch:
+          - x86-64-v3
+          - x86-64-v4
         compiler:
           - g++
           - clang++
-    runs-on: ${{ matrix.os }}
+        exclude:
+          - os: macos-latest
+            arch: x86-64-v4
+    runs-on: ${{ matrix.os.runner }}
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v4
@@ -25,28 +33,39 @@ jobs:
         run: ${{ matrix.compiler }} -v
 
       - name: Build Debug
-        run: make debug CXX=${{ matrix.compiler }} ARCH=x86-64-v3
+        run: make debug CXX=${{ matrix.compiler }} ARCH=${{ matrix.arch }}
 
       - name: Clean build
         run: make clean
 
       - name: Build Release
-        run: make CXX=${{ matrix.compiler }} ARCH=x86-64-v3
+        run: make CXX=${{ matrix.compiler }} ARCH=${{ matrix.arch }}
 
       - name: Test
         if: runner.os == 'Linux'
+        run: make CXX=${{ matrix.compiler }} test
+
+      - name: Prepare Binaries for Upload
         run: |
-          make CXX=${{ matrix.compiler }}
-          make CXX=${{ matrix.compiler }} test
+          chmod +x clockwork
+          mv clockwork clockwork-linux-${{ matrix.arch }}
+
+      - name: Upload Binaries
+        if: runner.os == 'Linux' && matrix.compiler == 'g++'
+        uses: actions/upload-artifact@v4
+        with:
+          name: clockwork-linux-${{ matrix.arch }}
+          path: clockwork-linux-${{ matrix.arch }}
 
   windows-compilation:
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { sys: mingw64, compiler: g++     }
-          - { sys: ucrt64,  compiler: g++     }
-          - { sys: clang64, compiler: clang++ }
+          - { arch: x86-64-v3, sys: mingw64, compiler: g++     }
+          - { arch: x86-64-v3, sys: ucrt64,  compiler: g++     }
+          - { arch: x86-64-v4, sys: ucrt64,  compiler: g++     }
+          - { arch: x86-64-v3, sys: clang64, compiler: clang++ }
     runs-on: windows-latest
     defaults:
       run:
@@ -69,13 +88,23 @@ jobs:
 
       - name: Build Debug
         if: matrix.compiler == 'clang++'
-        run: make debug CXX=${{ matrix.compiler }}
+        run: make debug CXX=${{ matrix.compiler }} ARCH=${{ matrix.arch }}
 
       - name: Clean Build
         run: make clean
 
       - name: Build Release
-        run: make CXX=${{ matrix.compiler }}
+        run: make CXX=${{ matrix.compiler }} ARCH=${{ matrix.arch }}
 
       - name: Test
         run: make CXX=${{ matrix.compiler }} test
+
+      - name: Prepare Binaries for Upload
+        run: mv clockwork.exe clockwork-windows-${{ matrix.arch }}.exe
+
+      - name: Upload Binaries
+        if: matrix.sys == 'ucrt64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: clockwork-windows-${{ matrix.arch }}
+          path: clockwork-windows-${{ matrix.arch }}.exe
