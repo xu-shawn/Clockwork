@@ -13,22 +13,21 @@ void UCIHandler::loop() {
     std::string input;
 
     while (std::getline(std::cin, input))
-        executeCommand(input);
+        execute_command(input);
 }
 
-void UCIHandler::handleCommandLine(int argc, char* argv[]) {
+void UCIHandler::handle_command_line(int argc, char* argv[]) {
     for (int i = 1; i < argc; ++i)
-        executeCommand(argv[i]);
+        execute_command(argv[i]);
 }
 
-void UCIHandler::executeCommand(const std::string& line) {
+void UCIHandler::execute_command(const std::string& line) {
     std::istringstream is{line};
 
     std::string command;
     is >> std::skipws >> command;
 
-    if (command == "uci")
-    {
+    if (command == "uci") {
         std::cout << "id Name Clockwork\n";
         std::cout << "id author The Clockwork community" << std::endl;
     }
@@ -37,54 +36,42 @@ void UCIHandler::executeCommand(const std::string& line) {
     else if (command == "quit")
         std::exit(0);
     else if (command == "go")
-        handleGo(is);
+        handle_go(is);
     else if (command == "position")
-        handlePosition(is);
+        handle_position(is);
     else
         std::cout << "Unknown command" << std::endl;
 }
 
-void UCIHandler::handleGo(std::istringstream& is) {
+void UCIHandler::handle_go(std::istringstream& is) {
     std::string token;
-    while (is >> token)
-    {
-        if (token == "depth")
-        {
+    while (is >> token) {
+        if (token == "depth") {
             is >> settings.depth;
         }
-        else if (token == "movetime")
-        {
-            is >> settings.moveTime;
+        else if (token == "movetime") {
+            is >> settings.move_time;
         }
-        else if (token == "wtime")
-        {
-            is >> settings.wTime;
+        else if (token == "wtime") {
+            is >> settings.w_time;
         }
-        else if (token == "btime")
-        {
-            is >> settings.bTime;
+        else if (token == "btime") {
+            is >> settings.b_time;
         }
-        else if (token == "winc")
-        {
-            is >> settings.wInc;
+        else if (token == "winc") {
+            is >> settings.w_inc;
         }
-        else if (token == "binc")
-        {
-            is >> settings.bInc;
+        else if (token == "binc") {
+            is >> settings.b_inc;
         }
     }
 }
 
-void UCIHandler::handlePosition(std::istringstream& is) {
+void UCIHandler::handle_position(std::istringstream& is) {
     std::string token;
-    if (is >> token)
-    {
-        if (token == "startpos")
-        {
-        }
-        else if (token == "fen")
-        {
-        }
+    if (is >> token) {
+        if (token == "startpos") {}
+        else if (token == "fen") {}
     }
 }
 
