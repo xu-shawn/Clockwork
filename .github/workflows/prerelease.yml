@@ -7,37 +7,8 @@ on:
         required: true
 
 jobs:
-  create_binaries:
-    strategy:
-      fail-fast: false
-      matrix:
-        arch:
-          - x86-64-v3
-          - x86-64-v4
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repo
-        uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-
-      - name: Check Compiler
-        run: g++ -v
-
-      - name: Build Release
-        run: make CXX=g++ ARCH=${{ matrix.arch }}
-
-      - name: Rename Binaries
-        run: mv clockwork clockwork-linux-${{ matrix.arch }}
-
-      - name: Upload Binaries
-        uses: actions/upload-artifact@v4
-        with:
-          name: clockwork-linux-${{ matrix.arch }}
-          path: clockwork-linux-${{ matrix.arch }}
-
   create_prerelease:
-    if: github.repository == 'official-clockwork/Clockwork' && github.ref == 'refs/heads/main'
+    if: github.repository == 'offical-clockwork/Clockwork' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -87,10 +58,15 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.token }}
 
   upload_binaries:
-    needs: [create_binaries, create_prerelease]
+    needs: [create_prerelease]
     strategy:
       fail-fast: false
       matrix:
+        os:
+          - platform: linux
+            extension: ''
+          - platform: windows
+            extension: '.exe'
         arch:
           - x86-64-v3
           - x86-64-v4
@@ -103,7 +79,7 @@ jobs:
       - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: clockwork-linux-${{ matrix.arch }}
+          name: clockwork-${{ matrix.os.platform }}-${{ matrix.arch }}
           path: artifacts
 
       - name: Check Pullable Commits
@@ -128,6 +104,6 @@ jobs:
           name: Clockwork dev-${{ env.COMMIT_DATE }}-${{ env.COMMIT_SHA }}
           tag_name: clockwork-dev-${{ env.COMMIT_DATE }}-${{ env.COMMIT_SHA }}
           prerelease: true
-          files: artifacts/clockwork-linux-${{ matrix.arch }}
+          files: artifacts/clockwork-${{ matrix.os.platform }}-${{ matrix.arch }}${{ matrix.os.extension }}
         env:
           GITHUB_TOKEN: ${{ secrets.token }}
