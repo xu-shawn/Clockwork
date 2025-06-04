@@ -30,7 +30,7 @@ CMAKE_FLAGS := -DCMAKE_CXX_COMPILER=$(CXX) -DCLOCKWORK_MARCH_TARGET=$(ARCH)
 
 EXE := "$(EXE)$(SUFFIX)"
 
-.PHONY: all release debug test clean
+.PHONY: all release debug test clean format
 
 all: release
 
@@ -48,3 +48,6 @@ test: release
 clean:
 	-$(RM_DIR) build-debug build-release
 	-$(RM) $(EXE)
+
+format:
+	./scripts/auto_format.sh
