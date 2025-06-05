@@ -1,9 +1,11 @@
 #pragma once
 
+#include <array>
+#include <cassert>
 #include <tuple>
 #include <utility>
 
-
+#include "common.hpp"
 #include "square.hpp"
 #include "util/types.hpp"
 #include "util/vec.hpp"
@@ -18,15 +20,15 @@ forceinline constexpr auto expand_sq(Square sq) -> u8 {
 
 // 0rrr0fff → 00rrrfff
 template<typename V>
-forceinline auto compress_coords(V list) -> std::tuple<V, typename V::Mask8> {
-    typename V::Mask8 valid = V::testn8(list, V::broadcast8(0x88));
-    V compressed = (list & V::broadcast8(0x07)) | V::shr16(list & V::broadcast8(0x70), 1);
+forceinline auto compress_coords(V list) -> std::tuple<V, V> {
+    V valid      = V::eq8_vm(list & V::broadcast8(0x88), V::zero());
+    V compressed = (list & V::broadcast8(0x07)) | (V::shr16(list, 1) & V::broadcast8(0x38));
     return {compressed, valid};
 }
 }  // namespace internal
 
 
-inline std::tuple<v512, u64> superpiece_rays(Square sq) {
+inline std::tuple<v512, v512> superpiece_rays(Square sq) {
     static const v512 OFFSETS = v512{std::array<u8, 64>{
       0x1F, 0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70,  // N
       0x21, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,  // NE
@@ -43,13 +45,12 @@ inline std::tuple<v512, u64> superpiece_rays(Square sq) {
     return internal::compress_coords(uncompressed);
 }
 
-inline u64 superpiece_attacks(u64 occupied, u64 ray_valid) {
-    u64 o = occupied | 0x8181818181818181;
-    u64 x = o ^ (o - 0x0303030303030303);
-    return x & ray_valid;
+inline v512 superpiece_attacks(v512 ray_places, v512 ray_valid) {
+    return v512::andnot(v512::eq8_vm(ray_places, v512::sub64(ray_places, v512::broadcast64(0x101))),
+                        ray_valid);
 }
 
-inline u64 attackers_from_rays(v512 ray_places) {
+inline v512 attackers_from_rays(v512 ray_places) {
     constexpr u8 K  = 1 << 0;
     constexpr u8 WP = 1 << 1;
     constexpr u8 BP = 1 << 2;
@@ -66,7 +67,7 @@ inline u64 attackers_from_rays(v512 ray_places) {
     constexpr u8 BPAWN_NEAR = B | Q | K | BP;
 
     static const v128 PTYPE_TO_BITS{
-      std::array<u8, 16>{{0, WP, N, B, R, Q, K, 0, 0, BP, N, B, R, Q, K, 0}}};
+      std::array<u8, 16>{{0, 0, WP, BP, N, N, B, B, R, R, Q, Q, K, K, 0, 0}}};
 
     static const v512 ATTACKER_MASK = v512{std::array<u8, 64>{
       HORSE, ORTH_NEAR,  ORTH, ORTH, ORTH, ORTH, ORTH, ORTH,  // N
@@ -81,7 +82,54 @@ inline u64 attackers_from_rays(v512 ray_places) {
 
     v512 bit_rays =
       v512::permute8(v512::shr16(ray_places, 4) & v512::broadcast8(0x0F), PTYPE_TO_BITS);
-    return (bit_rays & ATTACKER_MASK).nonzero8();
+    return v512::gts8_vm(bit_rays & ATTACKER_MASK, v512::zero());
 }
 
-}  // namespace rose::geometry
+inline v512 slider_mask(v512 ray_places) {
+    constexpr u8 R    = static_cast<u8>(PieceType::Rook) << 5;
+    constexpr u8 B    = static_cast<u8>(PieceType::Bishop) << 5;
+    constexpr u8 Q    = static_cast<u8>(PieceType::Queen) << 5;
+    constexpr u8 NONE = 1;
+
+    static const v512 ROOK_BISHOP_MASK = v512{std::array<u8, 64>{
+      NONE, R, R, R, R, R, R, R,  // N
+      NONE, B, B, B, B, B, B, B,  // NE
+      NONE, R, R, R, R, R, R, R,  // E
+      NONE, B, B, B, B, B, B, B,  // SE
+      NONE, R, R, R, R, R, R, R,  // S
+      NONE, B, B, B, B, B, B, B,  // SW
+      NONE, R, R, R, R, R, R, R,  // W
+      NONE, B, B, B, B, B, B, B,  // NW
+    }};
+    static const v512 QUEEN_MASK       = v512{std::array<u8, 64>{
+      NONE, Q, Q, Q, Q, Q, Q, Q,  // N
+      NONE, Q, Q, Q, Q, Q, Q, Q,  // NE
+      NONE, Q, Q, Q, Q, Q, Q, Q,  // E
+      NONE, Q, Q, Q, Q, Q, Q, Q,  // SE
+      NONE, Q, Q, Q, Q, Q, Q, Q,  // S
+      NONE, Q, Q, Q, Q, Q, Q, Q,  // SW
+      NONE, Q, Q, Q, Q, Q, Q, Q,  // W
+      NONE, Q, Q, Q, Q, Q, Q, Q,  // NW
+    }};
+
+    ray_places &= v512::broadcast8(0xE0);
+    return v512::eq8_vm(ray_places, ROOK_BISHOP_MASK) | v512::eq8_vm(ray_places, QUEEN_MASK);
+}
+
+extern const std::array<v512, 64> SUPERPIECE_INVERSE_RAYS_AVX2_TABLE;
+
+inline v512 superpiece_inverse_rays_avx2(Square sq) {
+    return SUPERPIECE_INVERSE_RAYS_AVX2_TABLE[sq.raw];
+}
+
+extern const std::array<v512, 64> PIECE_MOVES_AVX2_TABLE;
+
+inline v512 piece_moves_avx2(bool color, PieceType ptype, Square sq) {
+    assert(ptype != PieceType::None);
+    int  index = ptype == PieceType::Pawn ? color : static_cast<int>(ptype);
+    v512 bit   = v512::broadcast8(static_cast<u8>(1 << index));
+    v512 table = PIECE_MOVES_AVX2_TABLE[sq.raw];
+    return v512::eq8_vm(table & bit, bit);
+}
+
+}
