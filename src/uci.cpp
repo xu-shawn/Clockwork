@@ -1,4 +1,5 @@
 #include "uci.hpp"
+#include "search.h"
 
 #include <algorithm>
 #include <ios>
@@ -11,6 +12,7 @@
 #include "move.hpp"
 #include "perft.hpp"
 #include "position.hpp"
+#include "search.hpp"
 
 namespace Clockwork::UCI {
 
@@ -69,16 +71,23 @@ void UCIHandler::handle_go(std::istringstream& is) {
             is >> settings.depth;
         } else if (token == "movetime") {
             is >> settings.move_time;
+            std::cout << "Warning: \"go movetime\" search is not supported" << std::endl;
         } else if (token == "wtime") {
             is >> settings.w_time;
+            std::cout << "Warning: \"go wtime\" search is not supported" << std::endl;
         } else if (token == "btime") {
             is >> settings.b_time;
+            std::cout << "Warning: \"go btime\" search is not supported" << std::endl;
         } else if (token == "winc") {
             is >> settings.w_inc;
+            std::cout << "Warning: \"go winc\" search is not supported" << std::endl;
         } else if (token == "binc") {
             is >> settings.b_inc;
+            std::cout << "Warning: \"go binc\" search is not supported" << std::endl;
         }
     }
+    Search::Worker worker;
+    worker.launch_search(m_position, settings);
 }
 
 void UCIHandler::handle_position(std::istringstream& is) {
