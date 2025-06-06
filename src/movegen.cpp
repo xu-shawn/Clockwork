@@ -27,6 +27,7 @@ valid_pawns(Color color, Bitboard bb, Bitboard empty, Bitboard dests) {
                 single & Bitboard{0x000000000000FF00}, -8, -16};
     }
     }
+    unreachable();
 }
 
 void MoveGen::generate_moves(MoveList& moves) {
