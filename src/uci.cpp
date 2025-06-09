@@ -78,25 +78,31 @@ void UCIHandler::handle_bench(std::istringstream& is) {
 }
 
 void UCIHandler::handle_go(std::istringstream& is) {
+    // Clear any previous settings
+    settings = {};
     std::string token;
     while (is >> token) {
         if (token == "depth") {
             is >> settings.depth;
         } else if (token == "movetime") {
             is >> settings.move_time;
-            std::cout << "Warning: \"go movetime\" search is not supported" << std::endl;
+            settings.move_time = std::max(i64(0), settings.move_time);
         } else if (token == "wtime") {
             is >> settings.w_time;
-            std::cout << "Warning: \"go wtime\" search is not supported" << std::endl;
+            settings.w_time = std::max(i64(0), settings.w_time);
         } else if (token == "btime") {
             is >> settings.b_time;
-            std::cout << "Warning: \"go btime\" search is not supported" << std::endl;
+            settings.b_time = std::max(i64(0), settings.b_time);
         } else if (token == "winc") {
             is >> settings.w_inc;
-            std::cout << "Warning: \"go winc\" search is not supported" << std::endl;
+            settings.w_inc = std::max(i64(0), settings.w_inc);
         } else if (token == "binc") {
             is >> settings.b_inc;
-            std::cout << "Warning: \"go binc\" search is not supported" << std::endl;
+            settings.b_inc = std::max(i64(0), settings.b_inc);
+        } else if (token == "softnodes") {
+            is >> settings.soft_nodes;
+        } else if (token == "nodes") {
+            is >> settings.hard_nodes;
         }
     }
     Search::Worker worker;
