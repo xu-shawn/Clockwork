@@ -6,8 +6,10 @@
 #include <sstream>
 
 #include "board.hpp"
+#include "common.hpp"
 #include "geometry.hpp"
 #include "util/types.hpp"
+#include "zobrist.hpp"
 
 namespace Clockwork {
 
@@ -15,11 +17,18 @@ void Position::incrementally_remove_piece(bool color, PieceId id, Square from) {
     remove_attacks(color, id);
     toggle_rays(from);
 
+    // TODO: check if some speed left on the table for zobrist here
+    m_hash_key ^=
+      Zobrist::piece_square_zobrist[static_cast<size_t>(m_board[from].color())]
+                                   [static_cast<size_t>(m_board[from].ptype())][from.raw];
     m_board[from] = Place::empty();
 }
 
 void Position::incrementally_add_piece(bool color, Place p, Square to) {
+    // TODO: check if some speed left on the table for zobrist here
     m_board[to] = p;
+    m_hash_key ^= Zobrist::piece_square_zobrist[static_cast<size_t>(m_board[to].color())]
+                                               [static_cast<size_t>(m_board[to].ptype())][to.raw];
 
     v512 m = toggle_rays(to);
     add_attacks(color, p.id(), to, p.ptype(), m);
@@ -27,7 +36,12 @@ void Position::incrementally_add_piece(bool color, Place p, Square to) {
 
 void Position::incrementally_mutate_piece(
   bool old_color, PieceId old_id, Square sq, bool new_color, Place p) {
+    // TODO: check if some speed left on the table for zobrist here
+    m_hash_key ^= Zobrist::piece_square_zobrist[static_cast<size_t>(m_board[sq].color())]
+                                               [static_cast<size_t>(m_board[sq].ptype())][sq.raw];
     m_board[sq] = p;
+    m_hash_key ^= Zobrist::piece_square_zobrist[static_cast<size_t>(m_board[sq].color())]
+                                               [static_cast<size_t>(m_board[sq].ptype())][sq.raw];
 
     remove_attacks(old_color, old_id);
     add_attacks(new_color, p.id(), sq, p.ptype());
@@ -39,9 +53,17 @@ void Position::incrementally_move_piece(bool color, Square from, Square to, Plac
     auto [src_ray_coords, src_ray_valid] = geometry::superpiece_rays(from);
     auto [dst_ray_coords, dst_ray_valid] = geometry::superpiece_rays(to);
     v512 src_ray_places                  = v512::permute8(src_ray_coords, m_board.to_vec());
-    m_board[from]                        = Place::empty();
-    m_board[to]                          = p;
-    v512 dst_ray_places                  = v512::permute8(dst_ray_coords, m_board.to_vec());
+
+    // TODO: check if some speed left on the table for zobrist here
+    m_hash_key ^=
+      Zobrist::piece_square_zobrist[static_cast<size_t>(m_board[from].color())]
+                                   [static_cast<size_t>(m_board[from].ptype())][from.raw];
+    m_board[from] = Place::empty();
+    m_board[to]   = p;
+    m_hash_key ^= Zobrist::piece_square_zobrist[static_cast<size_t>(m_board[to].color())]
+                                               [static_cast<size_t>(m_board[to].ptype())][to.raw];
+
+    v512 dst_ray_places = v512::permute8(dst_ray_coords, m_board.to_vec());
 
     v512 src_all_sliders     = geometry::slider_mask(src_ray_places);
     v512 dst_all_sliders     = geometry::slider_mask(dst_ray_places);
@@ -198,9 +220,19 @@ Position Position::move(Move m) const {
     Place  dst   = m_board[to];
     bool   color = static_cast<bool>(m_active_color);
 
+    // move() makes a legal, non null move, so we always swap sides.
+    new_pos.m_hash_key ^= Zobrist::side_key;
+
     if (m_enpassant.is_valid()) {
+        // Remove hash for ep square
+        new_pos.m_hash_key ^= Zobrist::en_passant_zobrist[new_pos.m_enpassant.raw];
         new_pos.m_enpassant = Square::invalid();
     }
+
+    // Compute old castle index for zobrist indexing and remove it
+    size_t old_castle_index =
+      new_pos.m_rook_info[0].as_index() | (new_pos.m_rook_info[1].as_index() << 2);
+    new_pos.m_hash_key ^= Zobrist::castling_zobrist[old_castle_index];
 
     const auto CHECK_SRC_CASTLING_RIGHTS = [&] {
         if (src.ptype() == PieceType::Rook) {
@@ -229,6 +261,7 @@ Position Position::move(Move m) const {
                 Square ep   = Square{static_cast<u8>((from.raw + to.raw) / 2)};
                 if (is_square_attacked_by(ep, them, PieceType::Pawn)) {
                     new_pos.m_enpassant = ep;
+                    new_pos.m_hash_key ^= Zobrist::en_passant_zobrist[new_pos.m_enpassant.raw];
                 }
             }
         } else {
@@ -319,6 +352,11 @@ Position Position::move(Move m) const {
         break;
     }
     }
+
+    // Calculate the new castling index for zobrist indexing and add it back in
+    size_t new_castle_index =
+      new_pos.m_rook_info[0].as_index() | (new_pos.m_rook_info[1].as_index() << 2);
+    new_pos.m_hash_key ^= Zobrist::castling_zobrist[new_castle_index];
 
     new_pos.m_active_color = invert(m_active_color);
     new_pos.m_ply++;
@@ -615,8 +653,40 @@ std::optional<Position> Position::parse(std::string_view board,
     }
 
     result.m_attack_table = result.calc_attacks_slow();
+    result.m_hash_key     = result.calc_hash_key_slow();
 
     return result;
+}
+
+HashKey Position::calc_hash_key_slow() {
+    HashKey key = 0;
+
+    // Iterate over all the pieces
+    for (size_t sq_idx = 0; sq_idx < 64; sq_idx++) {
+        Place p = m_board.mailbox[sq_idx];
+        if (p.is_empty()) {
+            continue;
+        }
+        key ^= Zobrist::piece_square_zobrist[static_cast<size_t>(p.color())]
+                                            [static_cast<size_t>(p.ptype())][sq_idx];
+    }
+
+    // Add ep if available
+    if (m_enpassant != Square::invalid()) {
+        key ^= Zobrist::en_passant_zobrist[m_enpassant.raw];
+    }
+
+    // Add castling
+    // We may consider putting this as a separate function
+    size_t castle_index = m_rook_info[0].as_index() | (m_rook_info[1].as_index() << 2);
+    key ^= Zobrist::castling_zobrist[castle_index];
+
+    // Add stm
+    if (m_active_color == Color::Black) {
+        key ^= Zobrist::side_key;
+    }
+
+    return key;
 }
 
 std::ostream& operator<<(std::ostream& os, const Position& position) {
@@ -679,6 +749,15 @@ std::ostream& operator<<(std::ostream& os, const Position& position) {
     os << position.m_50mr << ' ' << (position.m_ply / 2 + 1);
 
     return os;
+}
+
+HashKey Position::get_hash_key() {
+    return m_hash_key;
+}
+
+bool Position::is_reversible(Move move) {
+    return !(move.is_capture() || move.is_promotion() || move.is_castle()
+             || (m_board.mailbox[move.from().raw].ptype() == PieceType::Pawn));
 }
 
 }

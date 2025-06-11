@@ -61,6 +61,10 @@ struct RookInfo {
         return !aside.is_valid() && !hside.is_valid();
     }
 
+    [[nodiscard]] constexpr size_t as_index() const {
+        return static_cast<size_t>(aside.is_valid()) | (static_cast<size_t>(hside.is_valid()) << 1);
+    }
+
     constexpr bool operator==(const RookInfo&) const = default;
 };
 
@@ -118,6 +122,10 @@ public:
 
     [[nodiscard]] std::tuple<Wordboard, Bitboard> calc_pin_mask() const;
 
+    [[nodiscard]] HashKey get_hash_key();
+
+    [[nodiscard]] bool is_reversible(Move move);
+
     const std::array<Wordboard, 2> calc_attacks_slow();
     const std::array<u16, 2>       calc_attacks_slow(Square sq);
 
@@ -131,6 +139,7 @@ public:
 
     bool                 operator==(const Position&) const = default;
     friend std::ostream& operator<<(std::ostream& os, const Position& position);
+    HashKey              calc_hash_key_slow();
 
 private:
     std::array<Wordboard, 2>            m_attack_table{};
@@ -143,6 +152,7 @@ private:
     Color                               m_active_color{};
     Square                              m_enpassant = Square::invalid();
     std::array<RookInfo, 2>             m_rook_info;
+    HashKey                             m_hash_key;
 
     void incrementally_remove_piece(bool color, PieceId id, Square sq);
     void incrementally_add_piece(bool color, Place p, Square sq);
