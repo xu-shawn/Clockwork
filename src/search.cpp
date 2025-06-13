@@ -356,7 +356,7 @@ Value Worker::evaluate(const Position& pos) {
          + 370 * (pos.piece_count(us, PieceType::Bishop) - pos.piece_count(them, PieceType::Bishop))
          + 550 * (pos.piece_count(us, PieceType::Rook) - pos.piece_count(them, PieceType::Rook))
          + 1000 * (pos.piece_count(us, PieceType::Queen) - pos.piece_count(them, PieceType::Queen))
-         + static_cast<i32>(search_nodes & 7) - 3;
+         + static_cast<i32>(search_nodes & 7) - 3 + 10;
 }
 }
 }
