@@ -28,6 +28,18 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Obtain Reference Bench
+        run: |
+          benchref=$(git show -s --format=%B HEAD | sed '1!G;h;$!d' | grep -m 1 -o -x '[[:space:]]*\b[Bb]ench[ :]\+[1-9][0-9]*\b[[:space:]]*' | sed 's/[^0-9]//g')
+          if [[ -n "$benchref" ]]; then
+            echo "benchref=$benchref" >> $GITHUB_ENV
+            echo "Reference bench: $benchref"
+          else
+            echo "ERROR: No reference bench found"
+            exit 1
+          fi
 
       - name: Check Compiler
         run: ${{ matrix.compiler }} -v
@@ -44,6 +56,16 @@ jobs:
       - name: Test
         if: runner.os == 'Linux'
         run: make CXX=${{ matrix.compiler }} test
+
+      - name: Check Bench
+        if: runner.os == 'Linux'
+        run: |
+          obtained=$(eval "./clockwork bench 2>&1" | tail -n 1 | awk '{print $1}')
+          if [ "${{ env.benchref }}" != "$obtained" ]; then
+            echo "signature mismatch: reference ${{ env.benchref }} obtained: $obtained."
+            exit 1
+          fi
+          echo "signature OK: $obtained"
 
       - name: Prepare Binaries for Upload
         run: |
@@ -75,13 +97,25 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Set Up MSYS2
         uses: msys2/setup-msys2@v2
         with:
           msystem: ${{ matrix.sys }}
-          install: make cmake
+          install: make cmake coreutils git
           pacboy: toolchain:p
+
+      - name: Obtain Reference Bench
+        run: |
+          benchref=$(git show -s --format=%B HEAD | sed '1!G;h;$!d' | grep -m 1 -o -x '[[:space:]]*\b[Bb]ench[ :]\+[1-9][0-9]*\b[[:space:]]*' | sed 's/[^0-9]//g')
+          if [[ -n "$benchref" ]]; then
+            echo "benchref=$benchref" >> $GITHUB_ENV
+            echo "Reference bench: $benchref"
+          else
+            echo "ERROR: No reference bench found"
+            exit 1
+          fi
 
       - name: Check Compiler
         run: ${{ matrix.compiler }} -v
@@ -98,6 +132,15 @@ jobs:
 
       - name: Test
         run: make CXX=${{ matrix.compiler }} test
+
+      - name: Check Bench
+        run: |
+          obtained=$(eval "./clockwork.exe bench 2>&1" | tail -n 1 | awk '{print $1}')
+          if [ "${{ env.benchref }}" != "$obtained" ]; then
+            echo "signature mismatch: reference ${{ env.benchref }} obtained: $obtained."
+            exit 1
+          fi
+          echo "signature OK: $obtained"
 
       - name: Prepare Binaries for Upload
         run: mv clockwork.exe clockwork-windows-${{ matrix.arch }}.exe
