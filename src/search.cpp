@@ -262,9 +262,10 @@ Value Worker::search(Position& pos, Stack* ss, Value alpha, Value beta, Depth de
     if (best_value >= beta && quiet_move(best_move)) {
         ss->killer = best_move;
 
-        m_td.history.update_quiet_stats(pos, best_move, depth * depth);
+        const i32 bonus = std::min(1896, 4 * depth * depth + 120 * depth - 120);
+        m_td.history.update_quiet_stats(pos, best_move, bonus);
         for (Move quiet : quiets_played) {
-            m_td.history.update_quiet_stats(pos, quiet, -depth * depth);
+            m_td.history.update_quiet_stats(pos, quiet, -bonus);
         }
     }
 
