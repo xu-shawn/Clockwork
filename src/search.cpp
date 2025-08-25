@@ -1,6 +1,7 @@
 #include "search.hpp"
 #include "board.hpp"
 #include "common.hpp"
+#include "evaluation.hpp"
 #include "movegen.hpp"
 #include "movepick.hpp"
 #include "see.hpp"
@@ -21,7 +22,6 @@ namespace Search {
 Value mated_in(i32 ply) {
     return -VALUE_MATED + ply;
 }
-
 
 Searcher::Searcher() :
     idle_barrier(std::make_unique<std::barrier<>>(1)),
@@ -332,7 +332,7 @@ Value Worker::search(
     }
 
     if (!PV_NODE && !is_in_check && depth >= tuned::nmp_depth && tt_adjusted_eval >= beta) {
-        int      R         = tuned::nmp_base_r + std::min(3, (tt_adjusted_eval - beta) / 300);
+        int      R         = tuned::nmp_base_r + std::min(3, (tt_adjusted_eval - beta) / 816);
         Position pos_after = pos.null_move();
 
         repetition_info.push(pos_after.get_hash_key(), true);
@@ -348,7 +348,7 @@ Value Worker::search(
     }
 
     // Razoring
-    if (!PV_NODE && !is_in_check && depth <= 7 && static_eval + 260 * depth < alpha) {
+    if (!PV_NODE && !is_in_check && depth <= 7 && static_eval + 707 * depth < alpha) {
         const Value razor_score = quiesce<IS_MAIN>(pos, ss, alpha, beta, ply);
         if (razor_score <= alpha) {
             return razor_score;
@@ -572,27 +572,11 @@ Value Worker::quiesce(const Position& pos, Stack* ss, Value alpha, Value beta, i
 }
 
 Value Worker::evaluate(const Position& pos) {
-    const Color us   = pos.active_color();
-    const Color them = invert(us);
-
-    Value material =
-      100 * (pos.piece_count(us, PieceType::Pawn) - pos.piece_count(them, PieceType::Pawn))
-      + 330 * (pos.piece_count(us, PieceType::Knight) - pos.piece_count(them, PieceType::Knight))
-      + 370 * (pos.piece_count(us, PieceType::Bishop) - pos.piece_count(them, PieceType::Bishop))
-      + 550 * (pos.piece_count(us, PieceType::Rook) - pos.piece_count(them, PieceType::Rook))
-      + 1000 * (pos.piece_count(us, PieceType::Queen) - pos.piece_count(them, PieceType::Queen));
-
-    Value mobility = 0;
-    for (u64 x : std::bit_cast<std::array<u64, 16>>(pos.attack_table(us))) {
-        mobility += 10 * std::popcount(x);
-    }
-    for (u64 x : std::bit_cast<std::array<u64, 16>>(pos.attack_table(them))) {
-        mobility -= 10 * std::popcount(x);
-    }
-
-    Value fudge = static_cast<i32>(search_nodes() & 7) - 3;
-
-    return material + mobility + fudge;
+#ifndef EVAL_TUNING
+    return static_cast<Value>(Clockwork::evaluate_stm_pov(pos));
+#else
+    return -VALUE_INF;  // Not implemented in tune mode
+#endif
 }
 }
 }

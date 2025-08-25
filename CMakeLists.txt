@@ -61,6 +61,9 @@ set(srcs
         src/bench.cpp
         src/bench.hpp
         src/common.hpp
+        src/evaluation.cpp
+        src/evaluation.hpp
+        src/eval_types.hpp
         src/geometry.cpp
         src/geometry.hpp
         src/move.cpp
@@ -90,11 +93,17 @@ set(srcs
         src/zobrist.hpp
         src/util/bit.hpp
         src/util/parse.hpp
+        src/util/pretty.hpp
         src/util/static_vector.hpp
         src/util/types.hpp
         src/util/vec.hpp
         src/util/vec/avx2.hpp
         src/util/vec/avx512.hpp
+        src/tuning/graph.hpp
+        src/tuning/loss.hpp
+        src/tuning/optim.hpp
+        src/tuning/value.cpp
+        src/tuning/value.hpp
 )
 
 add_library(clockwork-lib OBJECT ${srcs})
