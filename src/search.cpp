@@ -208,7 +208,7 @@ Move Worker::iterative_deepening(const Position& root_position) {
             if (score > VALUE_WIN && score < VALUE_MATED) {
                 return "mate " + std::to_string((VALUE_MATED + 1 - score) / 2);
             }
-            return "cp " + std::to_string(score);
+            return "cp " + std::to_string(score / 4);
         };
 
         // Get current time
