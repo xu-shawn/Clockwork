@@ -329,7 +329,7 @@ Value Worker::search(
             return 0;
         }
         // Insufficient material check
-        if (pos.is_insufficient_material()){
+        if (pos.is_insufficient_material()) {
             return 0;
         }
     }
@@ -442,8 +442,16 @@ Value Worker::search(
         // Put hash into repetition table. TODO: encapsulate this and any other future adjustment to do "on move" into a proper function
         repetition_info.push(pos_after.get_hash_key(), pos_after.is_reversible(m));
 
+        Depth extension = 0;
+
+        if (is_in_check && moves_played == 1) {
+            extension = 1;
+        } else if (pos_after.is_in_check()) {
+            extension = 1;
+        }
+
         // Get search value
-        Depth new_depth = depth - 1 + pos_after.is_in_check();
+        Depth new_depth = depth - 1 + extension;
         Value value;
         if (depth >= 3 && moves_played >= 3 + 2 * PV_NODE) {
             i32 reduction = static_cast<i32>(
