@@ -191,10 +191,11 @@ void Worker::start_searching() {
 
 template<bool IS_MAIN>
 Move Worker::iterative_deepening(const Position& root_position) {
-    std::array<Stack, MAX_PLY + 1> ss;
-    std::array<Move, MAX_PLY + 1>  pv;
+    constexpr usize SS_PADDING = 2;
+    std::array<Stack, MAX_PLY + SS_PADDING + 1> ss;
+    std::array<Move, MAX_PLY + SS_PADDING + 1>  pv;
 
-    for (u32 i = 0; i < static_cast<u32>(MAX_PLY); i++) {
+    for (u32 i = 0; i < static_cast<u32>(MAX_PLY + SS_PADDING + 1); i++) {
         ss[i].pv              = &pv[i];
         ss[i].cont_hist_entry = nullptr;
     }
@@ -235,7 +236,7 @@ Move Worker::iterative_deepening(const Position& root_position) {
         Value score = -VALUE_INF;
         while (true) {
             score =
-              search<IS_MAIN, true>(root_position, &ss[0], alpha, beta, search_depth, 0, false);
+              search<IS_MAIN, true>(root_position, &ss[SS_PADDING], alpha, beta, search_depth, 0, false);
 
             if (m_stopped) {
                 break;
@@ -259,7 +260,7 @@ Move Worker::iterative_deepening(const Position& root_position) {
         // Store information only if the last iterative deepening search completed
         last_search_depth = search_depth;
         last_search_score = score;
-        last_best_move    = *ss[0].pv;
+        last_best_move    = *ss[SS_PADDING].pv;
 
         // Check depth limit
         if (IS_MAIN && search_depth >= m_search_limits.depth_limit) {
@@ -348,13 +349,15 @@ Value Worker::search(
     }
 
     bool  is_in_check = pos.is_in_check();
+    bool improving    = false;
     Value correction  = 0;
     Value raw_eval    = -VALUE_INF;
-    Value static_eval = -VALUE_INF;
+    ss->static_eval = -VALUE_INF;
     if (!is_in_check) {
         correction  = m_td.history.get_correction(pos);
-        raw_eval    = is_in_check ? -VALUE_INF : evaluate(pos);
-        static_eval = raw_eval + correction;
+        raw_eval    = evaluate(pos);
+        ss->static_eval = raw_eval + correction;
+        improving = (ss-2)->static_eval != -VALUE_INF && ss->static_eval > (ss-2)->static_eval;
     }
 
     // Internal Iterative Reductions
@@ -363,8 +366,8 @@ Value Worker::search(
     }
 
     // Reuse TT score as a better positional evaluation
-    auto tt_adjusted_eval = static_eval;
-    if (tt_data && tt_data->bound != (tt_data->score > static_eval ? Bound::Upper : Bound::Lower)) {
+    auto tt_adjusted_eval = ss->static_eval;
+    if (tt_data && tt_data->bound != (tt_data->score > ss->static_eval ? Bound::Upper : Bound::Lower)) {
         tt_adjusted_eval = tt_data->score;
     }
 
@@ -391,7 +394,7 @@ Value Worker::search(
     }
 
     // Razoring
-    if (!PV_NODE && !is_in_check && depth <= 7 && static_eval + 707 * depth < alpha) {
+    if (!PV_NODE && !is_in_check && depth <= 7 && ss->static_eval + 707 * depth < alpha) {
         const Value razor_score = quiesce<IS_MAIN>(pos, ss, alpha, beta, ply);
         if (razor_score <= alpha) {
             return razor_score;
@@ -418,12 +421,12 @@ Value Worker::search(
 
         if (!ROOT_NODE && best_value > -VALUE_WIN) {
             // Late Move Pruning (LMP)
-            if (moves_played >= 3 + depth * depth) {
+            if (moves_played >= (3 + depth * depth) / (2 - improving)) {
                 break;
             }
 
             // Forward Futility Pruning
-            Value futility = static_eval + 500 + 100 * depth;
+            Value futility = ss->static_eval + 500 + 100 * depth;
             if (quiet && !is_in_check && depth <= 8 && futility <= alpha) {
                 moves.skip_quiets();
                 continue;
@@ -566,8 +569,8 @@ Value Worker::search(
     // Update to correction history.
     if (!is_in_check
         && !(best_move != Move::none() && (best_move.is_capture() || best_move.is_promotion()))
-        && !((bound == Bound::Lower && best_value <= static_eval)
-             || (bound == Bound::Upper && best_value >= static_eval))) {
+        && !((bound == Bound::Lower && best_value <= ss->static_eval)
+             || (bound == Bound::Upper && best_value >= ss->static_eval))) {
         m_td.history.update_correction_history(pos, depth, best_value - raw_eval);
     }
 
