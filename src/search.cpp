@@ -13,10 +13,12 @@
 #include "util/types.hpp"
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cmath>
 #include <iostream>
 #include <limits>
 #include <mutex>
+#include <numeric>
 
 
 namespace Clockwork {
@@ -170,8 +172,8 @@ void Worker::start_searching() {
         m_search_limits = {
           .hard_time_limit = TM::compute_hard_limit(m_search_start, m_searcher.settings,
                                                     root_position.active_color()),
-          .soft_time_limit = TM::compute_soft_limit(m_search_start, m_searcher.settings,
-                                                    root_position.active_color()),
+          .soft_time_limit = TM::compute_soft_limit<false>(m_search_start, m_searcher.settings,
+                                                    root_position.active_color(), 0.0),
           .soft_node_limit = m_searcher.settings.soft_nodes > 0 ? m_searcher.settings.soft_nodes
                                                                 : std::numeric_limits<u64>::max(),
           .hard_node_limit = m_searcher.settings.hard_nodes > 0 ? m_searcher.settings.hard_nodes
@@ -225,6 +227,8 @@ Move Worker::iterative_deepening(const Position& root_position) {
                   << " pv " << last_best_move << std::endl;
     };
 
+    m_node_counts.fill(0);
+
     for (Depth search_depth = 1; search_depth < MAX_PLY; search_depth++) {
         // Call search
         Value alpha = -VALUE_INF, beta = VALUE_INF;
@@ -266,11 +270,26 @@ Move Worker::iterative_deepening(const Position& root_position) {
         if (IS_MAIN && search_depth >= m_search_limits.depth_limit) {
             break;
         }
+
+        const auto total_nodes = std::reduce(std::begin(m_node_counts), std::end(m_node_counts), 0);
+        const auto best_move_nodes = m_node_counts[last_best_move.from_to()];
+        const auto nodes_tm_fraction =
+          static_cast<f64>(best_move_nodes) / static_cast<f64>(total_nodes);
+
         // Check soft node limit
         if (IS_MAIN && search_nodes() >= m_search_limits.soft_node_limit) {
             break;
         }
+
         time::TimePoint now = time::Clock::now();
+
+        // Starting from depth 6, recalculate the soft time limit based on the fraction of nodes (nodes_tm_fraction)
+        // We don't do it for too shallow depths because the node distribution is not stable enough
+        if (IS_MAIN && search_depth >= 6) {
+            m_search_limits.soft_time_limit = TM::compute_soft_limit<true>(
+              m_search_start, m_searcher.settings, root_position.active_color(), nodes_tm_fraction);
+        }
+
         // check soft time limit
         if (IS_MAIN && now >= m_search_limits.soft_time_limit) {
             break;
@@ -416,7 +435,8 @@ Value Worker::search(
 
     // Iterate over the move list
     for (Move m = moves.next(); m != Move::none(); m = moves.next()) {
-        bool quiet = quiet_move(m);
+        const auto nodes_before = m_search_nodes.load(std::memory_order::relaxed);
+        bool       quiet        = quiet_move(m);
 
         auto move_history = quiet ? m_td.history.get_quiet_stats(pos, m, ply, ss) : 0;
 
@@ -499,6 +519,10 @@ Value Worker::search(
         if (PV_NODE && (moves_played == 1 || value > alpha)) {
             value =
               -search<IS_MAIN, true>(pos_after, ss + 1, -beta, -alpha, new_depth, ply + 1, false);
+        }
+        const auto nodes_after = m_search_nodes.load(std::memory_order::relaxed);
+        if (ROOT_NODE) {
+            m_node_counts[m.from_to()] += nodes_after - nodes_before;
         }
 
         // TODO: encapsulate this and any other future adjustment to do "on going back" into a proper function
