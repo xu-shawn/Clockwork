@@ -106,11 +106,11 @@ Score evaluate_white_pov(const Position& pos, const PsqtState& psqt_state) {
     phase = std::min<i32>(phase, 24);
 
     i32 mob_count = 0;
-    for (u64 x : std::bit_cast<std::array<u64, 16>>(pos.attack_table(Color::White))) {
-        mob_count += std::popcount(x);
+    for (PieceId id : pos.get_piece_mask(Color::White)) {
+        mob_count += pos.mobility_of(Color::White, id);
     }
-    for (u64 x : std::bit_cast<std::array<u64, 16>>(pos.attack_table(Color::Black))) {
-        mob_count -= std::popcount(x);
+    for (PieceId id : pos.get_piece_mask(Color::Black)) {
+        mob_count -= pos.mobility_of(Color::Black, id);
     }
 
     const std::array<Bitboard, 2> pawns = {pos.board().bitboard_for(Color::White, PieceType::Pawn),
