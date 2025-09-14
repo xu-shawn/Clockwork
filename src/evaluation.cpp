@@ -1,5 +1,6 @@
 #include <ranges>
 
+#include "bitboard.hpp"
 #include "common.hpp"
 #include "position.hpp"
 #include "psqt_state.hpp"
@@ -8,6 +9,7 @@
 
 #include "eval_types.hpp"
 #include "square.hpp"
+#include "util/bit.hpp"
 
 namespace Clockwork {
 
@@ -37,6 +39,8 @@ const std::array<PScore, 28> QUEEN_MOBILITY = {
 const std::array<PScore, 9> KING_MOBILITY = {
     S(233,283), S(114,374), S(96,368), S(70,399), S(30,394), S(-10,386), S(-26,388), S(-37,350), S(22,251),
 };
+
+const PScore RFB_VAL = S(0, 0);
 
 const std::array<PScore, 48> PAWN_PSQT = {
     S(-179,455),    S(3,418),       S(66,451),      S(226,211),     S(176,222),     S(229,313),     S(84,347),      S(182,326),     //
@@ -149,8 +153,25 @@ Score evaluate_white_pov(const Position& pos, const PsqtState& psqt_state) {
                              * ((pos.piece_count(Color::White, PieceType::Bishop) >= 2)
                                 - (pos.piece_count(Color::Black, PieceType::Bishop) >= 2));
 
+    i32 rfb_count = 0;
+    for (PieceId rookId : pos.get_piece_mask(Color::White, PieceType::Rook)) {
+        Square   sq = pos.piece_list_sq(Color::White)[rookId];
+        Bitboard bb =
+          pos.attack_table(Color::White).get_piece_mask_bitboard(rookId.to_piece_mask());
+        rfb_count += (bb & (Bitboard(-1) << (sq.raw + 7))).popcount();
+    }
+    for (PieceId rookId : pos.get_piece_mask(Color::Black, PieceType::Rook)) {
+        Square   sq = pos.piece_list_sq(Color::Black)[rookId];
+        Bitboard bb =
+          pos.attack_table(Color::Black).get_piece_mask_bitboard(rookId.to_piece_mask());
+        rfb_count -= (bb & (Bitboard(-1) >> (70 - sq.raw))).popcount();
+    }
+
+    PScore rfb = RFB_VAL * rfb_count;
+
     PScore tempo = (us == Color::White) ? TEMPO_VAL : -TEMPO_VAL;
-    PScore sum   = psqt_state.score() + mobility + tempo + bishop_pair_bonus + doubled_pawns_bonus;
+    PScore sum =
+      psqt_state.score() + mobility + tempo + bishop_pair_bonus + doubled_pawns_bonus + rfb;
     return sum->phase<24>(phase);
 };
 
