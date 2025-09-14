@@ -24,7 +24,7 @@ const PScore TEMPO_VAL  = S(30,16);
 const PScore BISHOP_PAIR_VAL  = S(49,207);
 const PScore DOUBLED_PAWN_VAL = S(-71,-118);
 
-const PScore RFB = S(14,0);
+const PScore RFB_VAL = S(14,0);
 
 const std::array<PScore, 9> KNIGHT_MOBILITY = {
     S(-157,-200), S(-74,-111), S(-32,-25), S(-21,13), S(9,35), S(33,51), S(54,51), S(84,15), S(129,-59),
