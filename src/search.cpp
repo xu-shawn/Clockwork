@@ -173,7 +173,7 @@ void Worker::start_searching() {
           .hard_time_limit = TM::compute_hard_limit(m_search_start, m_searcher.settings,
                                                     root_position.active_color()),
           .soft_time_limit = TM::compute_soft_limit<false>(m_search_start, m_searcher.settings,
-                                                    root_position.active_color(), 0.0),
+                                                           root_position.active_color(), 0.0),
           .soft_node_limit = m_searcher.settings.soft_nodes > 0 ? m_searcher.settings.soft_nodes
                                                                 : std::numeric_limits<u64>::max(),
           .hard_node_limit = m_searcher.settings.hard_nodes > 0 ? m_searcher.settings.hard_nodes
@@ -392,7 +392,7 @@ Value Worker::search(
     }
 
     if (!PV_NODE && !is_in_check && depth <= tuned::rfp_depth
-        && tt_adjusted_eval >= beta + tuned::rfp_margin * depth) {
+        && tt_adjusted_eval >= beta + tuned::rfp_margin * depth - 60 * improving) {
         return tt_adjusted_eval;
     }
 
