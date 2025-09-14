@@ -175,8 +175,20 @@ public:
         return attack_table(color).read(sq).is_set(id);
     }
 
+    [[nodiscard]] Bitboard attacked_by(Color color, PieceType ptype) const {
+        return attack_table(color).get_piece_mask_bitboard(piece_list(color).mask_eq(ptype));
+    }
+
     [[nodiscard]] i32 mobility_of(Color color, PieceId id) const {
         return attack_table(color).count_matching_mask(id.to_piece_mask());
+    }
+
+    [[nodiscard]] i32 mobility_of(Color color, PieceId id, Bitboard mask) const {
+        return (attack_table(color).get_piece_mask_bitboard(id.to_piece_mask()) & mask).popcount();
+    }
+
+    [[nodiscard]] PieceType pt_of(Color color, PieceId id) const {
+        return piece_list(color)[id];
     }
 
     [[nodiscard]] i32 piece_count(Color color) const {
