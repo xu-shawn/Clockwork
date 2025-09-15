@@ -1,3 +1,4 @@
+#include "eval_constants.hpp"
 #include "eval_types.hpp"
 #include "evaluation.hpp"
 #include "position.hpp"
@@ -148,6 +149,12 @@ int main(int argc, char* argv[]) {
         print_table("ROOK_MOBILITY", ROOK_MOBILITY);
         print_table("QUEEN_MOBILITY", QUEEN_MOBILITY);
         print_table("KING_MOBILITY", KING_MOBILITY);
+        std::cout << std::endl;
+
+        std::cout << "const PScore KNIGHT_KING_RING = " << KNIGHT_KING_RING << ";" << std::endl;
+        std::cout << "const PScore BISHOP_KING_RING = " << BISHOP_KING_RING << ";" << std::endl;
+        std::cout << "const PScore ROOK_KING_RING   = " << ROOK_KING_RING << ";" << std::endl;
+        std::cout << "const PScore QUEEN_KING_RING  = " << QUEEN_KING_RING << ";" << std::endl;
         std::cout << std::endl;
 
         auto printPsqtArray = [](const std::string& name, const auto& arr) {

@@ -1,5 +1,6 @@
 #include <ranges>
 
+#include "bitboard.hpp"
 #include "common.hpp"
 #include "position.hpp"
 #include "psqt_state.hpp"
@@ -37,6 +38,11 @@ const std::array<PScore, 28> QUEEN_MOBILITY = {
 const std::array<PScore, 9> KING_MOBILITY = {
     S(491,672), S(158,434), S(40,471), S(31,495), S(-3,481), S(-41,457), S(-58,471), S(-66,445), S(10,318),
 };
+
+const PScore KNIGHT_KING_RING = S(0, 0);
+const PScore BISHOP_KING_RING = S(0, 0);
+const PScore ROOK_KING_RING   = S(0, 0);
+const PScore QUEEN_KING_RING  = S(0, 0);
 
 const std::array<PScore, 48> PAWN_PSQT = {
     S(-178,454),    S(14,417),      S(82,447),      S(202,228),     S(146,241),     S(205,331),     S(71,358),      S(158,337),     //
@@ -114,21 +120,27 @@ Score evaluate_white_pov(const Position& pos, const PsqtState& psqt_state) {
 
     phase = std::min<i32>(phase, 24);
 
-    PScore mobility = PSCORE_ZERO;
+    PScore mobility    = PSCORE_ZERO;
+    PScore king_attack = PSCORE_ZERO;
 
     auto add_mobility = [&](Color c, PScore& mob_count) {
         Bitboard bb = pos.bitboard_for(c, PieceType::Pawn) | pos.attacked_by(~c, PieceType::Pawn);
+        Bitboard king_ring = pos.king_ring(c);
         for (PieceId id : pos.get_piece_mask(c, PieceType::Knight)) {
             mobility += KNIGHT_MOBILITY[pos.mobility_of(c, id, ~bb)];
+            king_attack += KNIGHT_KING_RING * pos.mobility_of(c, id, ~king_ring);
         }
         for (PieceId id : pos.get_piece_mask(c, PieceType::Bishop)) {
             mobility += BISHOP_MOBILITY[pos.mobility_of(c, id, ~bb)];
+            king_attack += BISHOP_KING_RING * pos.mobility_of(c, id, ~king_ring);
         }
         for (PieceId id : pos.get_piece_mask(c, PieceType::Rook)) {
             mobility += ROOK_MOBILITY[pos.mobility_of(c, id, ~bb)];
+            king_attack += ROOK_KING_RING * pos.mobility_of(c, id, ~king_ring);
         }
         for (PieceId id : pos.get_piece_mask(c, PieceType::Queen)) {
             mobility += QUEEN_MOBILITY[pos.mobility_of(c, id, ~bb)];
+            king_attack += QUEEN_KING_RING * pos.mobility_of(c, id, ~king_ring);
         }
         mobility += KING_MOBILITY[pos.mobility_of(c, PieceId::king(), ~bb)];
     };
@@ -136,7 +148,6 @@ Score evaluate_white_pov(const Position& pos, const PsqtState& psqt_state) {
     add_mobility(Color::Black, mobility);
     mobility *= -1;  // Persy trick
     add_mobility(Color::White, mobility);
-
 
     const std::array<Bitboard, 2> pawns = {pos.board().bitboard_for(Color::White, PieceType::Pawn),
                                            pos.board().bitboard_for(Color::Black, PieceType::Pawn)};

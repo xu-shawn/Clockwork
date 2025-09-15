@@ -6,6 +6,7 @@
 #include <iosfwd>
 #include <tuple>
 
+#include "bitboard.hpp"
 #include "board.hpp"
 #include "move.hpp"
 #include "square.hpp"
@@ -119,6 +120,19 @@ public:
 
     [[nodiscard]] Square king_sq(Color color) const {
         return piece_list_sq(color)[PieceId{0}];
+    }
+
+    [[nodiscard]] Bitboard king_ring(Color color) const {
+        Bitboard king_ring = Bitboard::from_square(king_sq(color));
+        king_ring |= king_ring.shift(Direction::North);
+        king_ring |= king_ring.shift(Direction::South);
+        king_ring |= king_ring.shift(Direction::East);
+        king_ring |= king_ring.shift(Direction::West);
+        king_ring |= king_ring.shift(Direction::NorthEast);
+        king_ring |= king_ring.shift(Direction::SouthEast);
+        king_ring |= king_ring.shift(Direction::NorthWest);
+        king_ring |= king_ring.shift(Direction::SouthWest);
+        return king_ring;
     }
 
     [[nodiscard]] size_t king_side(Color color) const {
