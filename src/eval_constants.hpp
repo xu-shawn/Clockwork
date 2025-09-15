@@ -27,9 +27,10 @@ extern const std::array<PScore, 15> ROOK_MOBILITY;
 extern const std::array<PScore, 28> QUEEN_MOBILITY;
 extern const std::array<PScore, 9>  KING_MOBILITY;
 
+extern const std::array<PScore, 3> PAWN_KING_RING;
 extern const std::array<PScore, 3> KNIGHT_KING_RING;
 extern const std::array<PScore, 3> BISHOP_KING_RING;
 extern const std::array<PScore, 5> ROOK_KING_RING;
 extern const std::array<PScore, 6> QUEEN_KING_RING;
 
-}
+}  // namespace Clockwork

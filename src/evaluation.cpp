@@ -41,6 +41,7 @@ const std::array<PScore, 9> KING_MOBILITY = {
     S(429,740), S(148,437), S(30,480), S(20,507), S(-10,493), S(-40,469), S(-47,481), S(-40,451), S(57,321),
 };
 
+const std::array<PScore, 3> PAWN_KING_RING = {CS(0, 0), S(0, 0), S(0, 0)};
 const std::array<PScore, 3> KNIGHT_KING_RING = {
     CS(0,0), S(89,-43), S(125,-89),
 };
@@ -153,6 +154,9 @@ Score evaluate_white_pov(const Position& pos, const PsqtState& psqt_state) {
     auto add_mobility = [&](Color c, PScore& mob_count, PScore& k_attack) {
         Bitboard bb = pos.bitboard_for(c, PieceType::Pawn) | pos.attacked_by(~c, PieceType::Pawn);
         Bitboard king_ring = king_ring_table[pos.king_sq(~c).raw];
+        for (PieceId id : pos.get_piece_mask(c, PieceType::Pawn)) {
+            k_attack += PAWN_KING_RING[pos.mobility_of(c, id, king_ring)];
+        }
         for (PieceId id : pos.get_piece_mask(c, PieceType::Knight)) {
             mobility += KNIGHT_MOBILITY[pos.mobility_of(c, id, ~bb)];
             k_attack += KNIGHT_KING_RING[pos.mobility_of(c, id, king_ring)];
