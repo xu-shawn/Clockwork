@@ -32,4 +32,9 @@ extern const std::array<PScore, 3> BISHOP_KING_RING;
 extern const std::array<PScore, 5> ROOK_KING_RING;
 extern const std::array<PScore, 6> QUEEN_KING_RING;
 
+extern const std::array<PScore, 7>  KNIGHT_SECOND_KING_RING;
+extern const std::array<PScore, 7>  BISHOP_SECOND_KING_RING;
+extern const std::array<PScore, 9>  ROOK_SECOND_KING_RING;
+extern const std::array<PScore, 13> QUEEN_SECOND_KING_RING;
+
 }

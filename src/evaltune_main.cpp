@@ -162,6 +162,12 @@ int main(int argc, char* argv[]) {
         print_table("QUEEN_KING_RING", QUEEN_KING_RING);
         std::cout << std::endl;
 
+        print_table("KNIGHT_SECOND_KING_RING", KNIGHT_SECOND_KING_RING);
+        print_table("BISHOP_SECOND_KING_RING", BISHOP_SECOND_KING_RING);
+        print_table("ROOK_SECOND_KING_RING", ROOK_SECOND_KING_RING);
+        print_table("QUEEN_SECOND_KING_RING", QUEEN_SECOND_KING_RING);
+        std::cout << std::endl;
+
         auto printPsqtArray = [](const std::string& name, const auto& arr) {
             std::cout << "const std::array<PScore, " << arr.size() << "> " << name << " = {"
                       << std::endl;

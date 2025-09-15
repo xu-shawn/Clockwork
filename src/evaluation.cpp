@@ -54,6 +54,19 @@ const std::array<PScore, 6> QUEEN_KING_RING = {
     CS(0,0), S(2,50), S(95,31), S(267,-36), S(552,-117), S(801,-239),
 };
 
+const std::array<PScore, 7> KNIGHT_SECOND_KING_RING = {
+    CS(0,0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
+};
+const std::array<PScore, 7> BISHOP_SECOND_KING_RING = {
+    CS(0,0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0),
+};
+const std::array<PScore, 9> ROOK_SECOND_KING_RING = {
+    CS(0,0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0) 
+};
+const std::array<PScore, 13> QUEEN_SECOND_KING_RING = {
+    CS(0,0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0), S(0, 0)
+};
+
 const std::array<PScore, 48> PAWN_PSQT = {
     S(-165,443),    S(50,402),      S(118,434),     S(254,212),     S(193,226),     S(249,317),     S(102,347),     S(182,326),     //
     S(-29,101),     S(137,158),     S(92,51),       S(187,-15),     S(108,-6),      S(12,48),       S(-45,95),      S(-94,52),      //
@@ -114,7 +127,19 @@ const std::array<PScore, 64> KING_PSQT = {
 };
 // clang-format on
 
-std::array<Bitboard, 64> king_ring_table = []() {
+template<int radius>
+constexpr std::array<Bitboard, 64> generate_king_ring() {
+    static_assert(radius >= 1);
+    std::array<Bitboard, 64> king_ring = generate_king_ring<radius - 1>();
+    for (auto& kr_bb : king_ring) {
+        kr_bb = kr_bb.shift(Direction::NorthEast) | kr_bb.shift(Direction::SouthEast)
+              | kr_bb.shift(Direction::NorthWest) | kr_bb.shift(Direction::SouthWest);
+    }
+    return king_ring;
+}
+
+template<>
+constexpr std::array<Bitboard, 64> generate_king_ring<1>() {
     std::array<Bitboard, 64> king_ring_table{};
     for (u8 sq_idx = 0; sq_idx < 64; sq_idx++) {
         Bitboard sq_bb     = Bitboard::from_square(Square{sq_idx});
@@ -130,7 +155,10 @@ std::array<Bitboard, 64> king_ring_table = []() {
         king_ring_table[sq_idx] = king_ring;
     }
     return king_ring_table;
-}();
+}
+
+std::array<Bitboard, 64> king_ring_table        = generate_king_ring<1>();
+std::array<Bitboard, 64> second_king_ring_table = generate_king_ring<2>();
 
 Score evaluate_white_pov(const Position& pos, const PsqtState& psqt_state) {
     const Color us    = pos.active_color();
@@ -152,22 +180,27 @@ Score evaluate_white_pov(const Position& pos, const PsqtState& psqt_state) {
 
     auto add_mobility = [&](Color c, PScore& mob_count, PScore& k_attack) {
         Bitboard bb = pos.bitboard_for(c, PieceType::Pawn) | pos.attacked_by(~c, PieceType::Pawn);
-        Bitboard king_ring = king_ring_table[pos.king_sq(~c).raw];
+        Bitboard king_ring        = king_ring_table[pos.king_sq(~c).raw];
+        Bitboard second_king_ring = second_king_ring_table[pos.king_sq(~c).raw];
         for (PieceId id : pos.get_piece_mask(c, PieceType::Knight)) {
             mobility += KNIGHT_MOBILITY[pos.mobility_of(c, id, ~bb)];
             k_attack += KNIGHT_KING_RING[pos.mobility_of(c, id, king_ring)];
+            k_attack += KNIGHT_SECOND_KING_RING.at(pos.mobility_of(c, id, second_king_ring));
         }
         for (PieceId id : pos.get_piece_mask(c, PieceType::Bishop)) {
             mobility += BISHOP_MOBILITY[pos.mobility_of(c, id, ~bb)];
             k_attack += BISHOP_KING_RING[pos.mobility_of(c, id, king_ring)];
+            k_attack += BISHOP_SECOND_KING_RING.at(pos.mobility_of(c, id, second_king_ring));
         }
         for (PieceId id : pos.get_piece_mask(c, PieceType::Rook)) {
             mobility += ROOK_MOBILITY[pos.mobility_of(c, id, ~bb)];
             k_attack += ROOK_KING_RING[pos.mobility_of(c, id, king_ring)];
+            k_attack += ROOK_SECOND_KING_RING.at(pos.mobility_of(c, id, second_king_ring));
         }
         for (PieceId id : pos.get_piece_mask(c, PieceType::Queen)) {
             mobility += QUEEN_MOBILITY[pos.mobility_of(c, id, ~bb)];
             k_attack += QUEEN_KING_RING[pos.mobility_of(c, id, king_ring)];
+            k_attack += QUEEN_SECOND_KING_RING.at(pos.mobility_of(c, id, second_king_ring));
         }
         mobility += KING_MOBILITY[pos.mobility_of(c, PieceId::king(), ~bb)];
     };
