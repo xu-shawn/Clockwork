@@ -112,9 +112,11 @@ using PScore = Autograd::PairPtr;
 
 #ifdef EVAL_TUNING
     #define S(a, b) Autograd::Pair::create_tunable((a), (b))  // Defines a tunable pscore
-    #define PSCORE_ZERO Autograd::Pair::create(0, 0)
+    #define CS(a, b) Autograd::Pair::create((a), (b))
+    #define PSCORE_ZERO CS(0, 0)
 #else
     #define S(a, b) PScore((a), (b))  // Defines a constant pscore when not tuning
+    #define CS(a, b) S((a), (b))
     #define PSCORE_ZERO S(0, 0)
 #endif
 

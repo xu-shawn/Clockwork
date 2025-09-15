@@ -297,6 +297,7 @@ public:
 class Pair : public SmartBackwardable<Pair> {
 private:
     std::function<void(PairPtr)> m_backward_func;
+    bool                         m_constant;
 
 public:
     friend class Graph;
@@ -305,14 +306,16 @@ public:
     f128 m_values;     // stores (first, second)
     f128 m_gradients;  // stores (grad_first, grad_second)
 
-    explicit Pair(f64 first, f64 second) :
+    explicit Pair(f64 first, f64 second, bool constant = false) :
         m_values(f128::make(first, second)),
-        m_gradients(f128::zero()) {
+        m_gradients(f128::zero()),
+        m_constant(constant) {
     }
 
-    explicit Pair(const f128& values) :
+    explicit Pair(const f128& values, bool constant = false) :
         m_values(values),
-        m_gradients(f128::zero()) {
+        m_gradients(f128::zero()),
+        m_constant(false) {
     }
 
     static PairPtr create_tunable(f64 first, f64 second);
@@ -518,7 +521,8 @@ public:
         os << "Pair(first=" << p->first() << ", second=" << p->second()
            << ", grad_first=" << p->grad_first() << ", grad_second=" << p->grad_second() << ")";
 #else
-        os << "S(" << static_cast<i32>(p->first() + 0.5) << ","
+        os << (p->m_constant ? "CS" : "S");
+        os << "(" << static_cast<i32>(p->first() + 0.5) << ", "
            << static_cast<i32>(p->second() + 0.5) << ")";
 #endif
         return os;
