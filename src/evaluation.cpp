@@ -1,3 +1,4 @@
+#include <array>
 #include <ranges>
 
 #include "bitboard.hpp"
@@ -104,6 +105,24 @@ const std::array<PScore, 64> KING_PSQT = {
 };
 // clang-format on
 
+std::array<Bitboard, 64> king_ring_table = []() {
+    std::array<Bitboard, 64> king_ring_table{};
+    for (u8 sq_idx = 0; sq_idx < 64; sq_idx++) {
+        Bitboard sq_bb = Bitboard::from_square(Square{sq_idx});
+        Bitboard king_ring{};
+        king_ring |= king_ring.shift(Direction::North);
+        king_ring |= king_ring.shift(Direction::South);
+        king_ring |= king_ring.shift(Direction::East);
+        king_ring |= king_ring.shift(Direction::West);
+        king_ring |= king_ring.shift(Direction::NorthEast);
+        king_ring |= king_ring.shift(Direction::SouthEast);
+        king_ring |= king_ring.shift(Direction::NorthWest);
+        king_ring |= king_ring.shift(Direction::SouthWest);
+        king_ring_table[sq_idx] = king_ring;
+    }
+    return king_ring_table;
+}();
+
 Score evaluate_white_pov(const Position& pos, const PsqtState& psqt_state) {
 
     const Color us    = pos.active_color();
@@ -125,7 +144,7 @@ Score evaluate_white_pov(const Position& pos, const PsqtState& psqt_state) {
 
     auto add_mobility = [&](Color c, PScore& mob_count, PScore& k_attack) {
         Bitboard bb = pos.bitboard_for(c, PieceType::Pawn) | pos.attacked_by(~c, PieceType::Pawn);
-        Bitboard king_ring = pos.king_ring(~c);
+        Bitboard king_ring = king_ring_table[pos.king_sq(~c).raw];
         for (PieceId id : pos.get_piece_mask(c, PieceType::Knight)) {
             mobility += KNIGHT_MOBILITY[pos.mobility_of(c, id, ~bb)];
             k_attack += KNIGHT_KING_RING * pos.mobility_of(c, id, king_ring);
