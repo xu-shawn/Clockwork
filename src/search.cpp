@@ -322,6 +322,7 @@ Value Worker::search(
     }
 
     const bool ROOT_NODE = ply == 0;
+    bool  excluded    = ss->excluded_move != Move::none();
 
     // TODO: search nodes limit condition here
     // ...
@@ -360,7 +361,7 @@ Value Worker::search(
         return evaluate(pos);
     }
 
-    auto tt_data = m_searcher.tt.probe(pos, ply);
+    auto tt_data = excluded ? std::nullopt : m_searcher.tt.probe(pos, ply);
     if (!PV_NODE && tt_data && tt_data->depth >= depth
         && (tt_data->bound == Bound::Exact
             || (tt_data->bound == Bound::Lower && tt_data->score >= beta)
@@ -381,7 +382,7 @@ Value Worker::search(
     }
 
     // Internal Iterative Reductions
-    if ((PV_NODE || cutnode) && depth >= 8 && (!tt_data || tt_data->move == Move::none())) {
+    if (!excluded && (PV_NODE || cutnode) && depth >= 8 && (!tt_data || tt_data->move == Move::none())) {
         depth--;
     }
 
@@ -392,12 +393,12 @@ Value Worker::search(
         tt_adjusted_eval = tt_data->score;
     }
 
-    if (!PV_NODE && !is_in_check && depth <= tuned::rfp_depth
+    if (!PV_NODE && !excluded && !is_in_check && depth <= tuned::rfp_depth
         && tt_adjusted_eval >= beta + tuned::rfp_margin * depth) {
         return tt_adjusted_eval;
     }
 
-    if (!PV_NODE && !is_in_check && !pos.is_kp_endgame() && depth >= tuned::nmp_depth
+    if (!PV_NODE && !excluded && !is_in_check && !pos.is_kp_endgame() && depth >= tuned::nmp_depth
         && tt_adjusted_eval >= beta) {
         int R =
           tuned::nmp_base_r + depth / 4 + std::min(3, (tt_adjusted_eval - beta) / 400) + improving;
@@ -416,7 +417,7 @@ Value Worker::search(
     }
 
     // Razoring
-    if (!PV_NODE && !is_in_check && depth <= 7 && ss->static_eval + 707 * depth < alpha) {
+    if (!PV_NODE && !excluded && !is_in_check && depth <= 7 && ss->static_eval + 707 * depth < alpha) {
         const Value razor_score = quiesce<IS_MAIN>(pos, ss, alpha, beta, ply);
         if (razor_score <= alpha) {
             return razor_score;
@@ -468,6 +469,21 @@ Value Worker::search(
             }
         }
 
+        // Singular extensions
+        int extension = 0;
+        if (!excluded && tt_data && m == tt_data->move && depth >= 6 && tt_data->depth >= depth - 3 && tt_data->bound & Bound::Lower) {
+            Value singular_beta = tt_data->score - 2 * depth;
+            int singular_depth = depth / 2;
+
+            ss->excluded_move = m;
+            Value singular_value = search<IS_MAIN, false>(pos, ss, singular_beta - 1, singular_beta, singular_depth, ply, cutnode);
+            ss->excluded_move = Move::none();
+
+            if (singular_value < singular_beta) {
+                extension = 1;
+            }
+        }
+
         // Do move
         ss->cont_hist_entry = &m_td.history.get_cont_hist_entry(pos, m);
 
@@ -478,7 +494,7 @@ Value Worker::search(
         repetition_info.push(pos_after.get_hash_key(), pos_after.is_reversible(m));
 
         // Get search value
-        Depth new_depth = depth - 1 + pos_after.is_in_check();
+        Depth new_depth = depth - 1 + extension + pos_after.is_in_check();
         Value value;
         if (depth >= 3 && moves_played >= 2 + 2 * PV_NODE) {
             i32 reduction = static_cast<i32>(
