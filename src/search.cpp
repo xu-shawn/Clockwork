@@ -322,7 +322,7 @@ Value Worker::search(
     }
 
     const bool ROOT_NODE = ply == 0;
-    bool  excluded    = ss->excluded_move != Move::none();
+    bool       excluded  = ss->excluded_move != Move::none();
 
     // TODO: search nodes limit condition here
     // ...
@@ -382,7 +382,8 @@ Value Worker::search(
     }
 
     // Internal Iterative Reductions
-    if (!excluded && (PV_NODE || cutnode) && depth >= 8 && (!tt_data || tt_data->move == Move::none())) {
+    if (!excluded && (PV_NODE || cutnode) && depth >= 8
+        && (!tt_data || tt_data->move == Move::none())) {
         depth--;
     }
 
@@ -417,7 +418,8 @@ Value Worker::search(
     }
 
     // Razoring
-    if (!PV_NODE && !excluded && !is_in_check && depth <= 7 && ss->static_eval + 707 * depth < alpha) {
+    if (!PV_NODE && !excluded && !is_in_check && depth <= 7
+        && ss->static_eval + 707 * depth < alpha) {
         const Value razor_score = quiesce<IS_MAIN>(pos, ss, alpha, beta, ply);
         if (razor_score <= alpha) {
             return razor_score;
@@ -471,13 +473,15 @@ Value Worker::search(
 
         // Singular extensions
         int extension = 0;
-        if (!excluded && tt_data && m == tt_data->move && depth >= 6 && tt_data->depth >= depth - 3 && tt_data->bound & Bound::Lower) {
-            Value singular_beta = tt_data->score - 2 * depth;
-            int singular_depth = depth / 2;
+        if (!excluded && tt_data && m == tt_data->move && depth >= 6 && tt_data->depth >= depth - 3
+            && tt_data->bound & Bound::Lower) {
+            Value singular_beta  = tt_data->score - 2 * depth;
+            int   singular_depth = depth / 2;
 
-            ss->excluded_move = m;
-            Value singular_value = search<IS_MAIN, false>(pos, ss, singular_beta - 1, singular_beta, singular_depth, ply, cutnode);
-            ss->excluded_move = Move::none();
+            ss->excluded_move    = m;
+            Value singular_value = search<IS_MAIN, false>(pos, ss, singular_beta - 1, singular_beta,
+                                                          singular_depth, ply, cutnode);
+            ss->excluded_move    = Move::none();
 
             if (singular_value < singular_beta) {
                 extension = 1;
@@ -608,17 +612,19 @@ Value Worker::search(
         }
     }
 
-    Bound bound = best_value >= beta        ? Bound::Lower
-                : best_move != Move::none() ? Bound::Exact
-                                            : Bound::Upper;
-    m_searcher.tt.store(pos, ply, best_move, best_value, depth, bound);
+    if (!excluded) {
+        Bound bound = best_value >= beta        ? Bound::Lower
+                    : best_move != Move::none() ? Bound::Exact
+                                                : Bound::Upper;
+        m_searcher.tt.store(pos, ply, best_move, best_value, depth, bound);
 
-    // Update to correction history.
-    if (!is_in_check
-        && !(best_move != Move::none() && (best_move.is_capture() || best_move.is_promotion()))
-        && !((bound == Bound::Lower && best_value <= ss->static_eval)
-             || (bound == Bound::Upper && best_value >= ss->static_eval))) {
-        m_td.history.update_correction_history(pos, depth, best_value - raw_eval);
+        // Update to correction history.
+        if (!is_in_check
+            && !(best_move != Move::none() && (best_move.is_capture() || best_move.is_promotion()))
+            && !((bound == Bound::Lower && best_value <= ss->static_eval)
+                 || (bound == Bound::Upper && best_value >= ss->static_eval))) {
+            m_td.history.update_correction_history(pos, depth, best_value - raw_eval);
+        }
     }
 
     return best_value;
