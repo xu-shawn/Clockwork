@@ -441,6 +441,10 @@ Value Worker::search(
 
     // Iterate over the move list
     for (Move m = moves.next(); m != Move::none(); m = moves.next()) {
+        if (m == ss->excluded_move) {
+            continue;
+        }
+
         const auto nodes_before = m_search_nodes.load(std::memory_order::relaxed);
         bool       quiet        = quiet_move(m);
 
