@@ -31,7 +31,7 @@ public:
             auto& pieces                          = pos.piece_list(c);
             auto& squares                         = pos.piece_list_sq(c);
 
-            for (size_t i = 0; i < 16; i++) {
+            for (u8 i = 0; i < 16; i++) {
                 PieceType pt = pieces[i];
                 if (pt == PieceType::None) {
                     continue;

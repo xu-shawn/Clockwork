@@ -13,7 +13,7 @@ time::TimePoint compute_hard_limit(time::TimePoint               search_start,
     auto hard_limit = TimePoint::max();
 
     if (settings.w_time >= 0) {
-        const auto compute_buffer_time = [&]() -> u64 {
+        const auto compute_buffer_time = [&]() -> i64 {
             if (stm == Color::White) {
                 return settings.w_time / 4;
             } else {
