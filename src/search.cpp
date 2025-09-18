@@ -1,5 +1,4 @@
 #include "search.hpp"
-
 #include "board.hpp"
 #include "common.hpp"
 #include "evaluation.hpp"
@@ -20,11 +19,17 @@
 #include <mutex>
 #include <numeric>
 
-
 namespace Clockwork {
 namespace Search {
-Value mated_in(i32 ply) {
+static Value mated_in(i32 ply) {
     return -VALUE_MATED + ply;
+}
+
+std::ostream& operator<<(std::ostream& os, const PV& pv) {
+    for (Move m : pv.m_pv) {
+        os << m << ' ';
+    }
+    return os;
 }
 
 Searcher::Searcher() :
@@ -195,16 +200,15 @@ template<bool IS_MAIN>
 Move Worker::iterative_deepening(const Position& root_position) {
     constexpr usize                             SS_PADDING = 2;
     std::array<Stack, MAX_PLY + SS_PADDING + 1> ss;
-    std::array<Move, MAX_PLY + SS_PADDING + 1>  pv;
 
     for (u32 i = 0; i < static_cast<u32>(MAX_PLY + SS_PADDING + 1); i++) {
-        ss[i].pv              = &pv[i];
         ss[i].cont_hist_entry = nullptr;
     }
 
     Depth last_search_depth = 0;
     Value last_search_score = -VALUE_INF;
     Move  last_best_move    = Move::none();
+    PV    last_pv{};
 
     const auto print_info_line = [&] {
         // Lambda to convert internal units score to uci score. TODO: add eval rescaling here once we get one
@@ -224,7 +228,8 @@ Move Worker::iterative_deepening(const Position& root_position) {
         std::cout << std::dec << "info depth " << last_search_depth << " score "
                   << format_score(last_search_score) << " nodes " << m_searcher.node_count()
                   << " nps " << time::nps(m_searcher.node_count(), curr_time - m_search_start)
-                  << " pv " << last_best_move << std::endl;
+                  << " time " << time::cast<time::Milliseconds>(curr_time - m_search_start).count()
+                  << " pv " << last_pv << std::endl;
     };
 
     m_node_counts.fill(0);
@@ -265,7 +270,8 @@ Move Worker::iterative_deepening(const Position& root_position) {
         // Store information only if the last iterative deepening search completed
         last_search_depth = search_depth;
         last_search_score = score;
-        last_best_move    = *ss[SS_PADDING].pv;
+        last_pv           = ss[SS_PADDING].pv;
+        last_best_move    = last_pv.first_move();
 
         // Check depth limit
         if (IS_MAIN && search_depth >= m_search_limits.depth_limit) {
@@ -313,6 +319,8 @@ Move Worker::iterative_deepening(const Position& root_position) {
 template<bool IS_MAIN, bool PV_NODE>
 Value Worker::search(
   const Position& pos, Stack* ss, Value alpha, Value beta, Depth depth, i32 ply, bool cutnode) {
+    ss->pv.clear();
+
     if (m_stopped) {
         return 0;
     }
@@ -541,11 +549,11 @@ Value Worker::search(
 
         if (value > best_value) {
             best_value = value;
-            if (ply == 0) {
-                ss->pv[ply] = m;  // No pv update for now, just bestmove
-            }
 
             if (value > alpha) {
+                if (PV_NODE) {
+                    ss->pv.set(m, (ss + 1)->pv);
+                }
                 alpha     = value;
                 best_move = m;
                 alpha_raises++;
@@ -610,6 +618,8 @@ Value Worker::search(
 
 template<bool IS_MAIN>
 Value Worker::quiesce(const Position& pos, Stack* ss, Value alpha, Value beta, i32 ply) {
+    ss->pv.clear();
+
     if (m_stopped) {
         return 0;
     }
