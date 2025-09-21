@@ -458,7 +458,7 @@ Value Worker::search(
             }
 
             // Forward Futility Pruning
-            Value futility = ss->static_eval + 500 + 100 * depth;
+            Value futility = ss->static_eval + 300 + 100 * depth;
             if (quiet && !is_in_check && depth <= 8 && futility <= alpha) {
                 moves.skip_quiets();
                 continue;
