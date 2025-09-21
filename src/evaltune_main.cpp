@@ -27,7 +27,7 @@ int main() {
     std::vector<f64>      results;
 
     // List of files to load
-    std::vector<std::string> fenFiles = {"data/v2.2/filtered_data.txt"};
+    std::vector<std::string> fenFiles = {"data/v2.2/filtered_data.txt", "data/v2.1/filtered_data.txt"};
 
     for (const auto& filename : fenFiles) {
         std::ifstream fenFile(filename);
@@ -84,7 +84,7 @@ int main() {
 
     i32       epochs     = 1000;
     const f64 K          = 1.0 / 400;
-    size_t    batch_size = 16384;  // Set batch size here
+    size_t    batch_size = 16 * 16384;  // Set batch size here
 
     std::mt19937 rng(std::random_device{}());  // Random number generator for shuffling
 
