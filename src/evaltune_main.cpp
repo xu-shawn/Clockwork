@@ -9,6 +9,7 @@
 #include "util/pretty.hpp"
 #include "util/types.hpp"
 #include <algorithm>
+#include <barrier>
 #include <fstream>
 #include <functional>
 #include <iomanip>
@@ -28,13 +29,13 @@ int main() {
     std::vector<f64>      results;
 
     // List of files to load
-    std::vector<std::string> fenFiles = {
+    const std::vector<std::string> fenFiles = {
       "data/v2.2/filtered_data.txt",
       "data/v2.1/filtered_data.txt",
     };
 
     // Number of threads to use, default to half available
-    u32 thread_count = std::max<u32>(1, std::thread::hardware_concurrency());
+    const u32 thread_count = std::max<u32>(1, std::thread::hardware_concurrency() / 2);
 
     std::cout << "Running on " << thread_count << " threads" << std::endl;
 
@@ -91,51 +92,56 @@ int main() {
 
     using namespace Clockwork::Autograd;
 
-    ParameterCountInfo parameter_count          = Globals::get().get_parameter_counts();
-    Parameters         current_parameter_values = Graph::get().get_all_parameter_values();
+    const ParameterCountInfo parameter_count          = Globals::get().get_parameter_counts();
+    Parameters               current_parameter_values = Graph::get().get_all_parameter_values();
 
     AdamW optim(parameter_count, 10, 0.9, 0.999, 1e-8, 0.0);
 
-    i32       epochs     = 1000;
-    const f64 K          = 1.0 / 400;
-    size_t    batch_size = 16 * 16384;  // Set batch size here
+    const i32    epochs     = 1000;
+    const f64    K          = 1.0 / 400;
+    const size_t batch_size = 16 * 16384;  // Set batch size here
 
     std::mt19937 rng(std::random_device{}());  // Random number generator for shuffling
 
-    for (i32 epoch = 0; epoch < epochs; epoch++) {
-        // Print epoch header
-        std::cout << "Epoch " << (epoch + 1) << "/" << epochs << std::endl;
+    const size_t        total_batches = (positions.size() + batch_size - 1) / batch_size;
+    std::vector<size_t> indices(positions.size());
 
-        std::vector<size_t> indices(positions.size());
-        std::iota(indices.begin(), indices.end(), 0);
-        std::shuffle(indices.begin(), indices.end(), rng);
+    Parameters batch_gradients = Parameters::zeros(parameter_count);
 
-        size_t total_batches = (positions.size() + batch_size - 1) / batch_size;
+    std::mutex   mutex;
+    std::barrier epoch_barrier{thread_count + 1};
+    std::barrier batch_barrier{thread_count + 1, [&] {
+                                   std::lock_guard guard{mutex};
+                                   batch_gradients = Parameters::zeros(parameter_count);
+                               }};
 
-        for (size_t batch_idx = 0, batch_start = 0; batch_start < positions.size();
-             batch_start += batch_size, ++batch_idx) {
-            size_t batch_end          = std::min(batch_start + batch_size, positions.size());
-            size_t current_batch_size = batch_end - batch_start;
-            size_t subbatch_size      = (current_batch_size + thread_count - 1) / thread_count;
+    for (u32 thread_idx = 0; thread_idx < thread_count; thread_idx++) {
+        std::thread([&, thread_idx] {
+            Graph::get().cleanup();
 
-            Parameters batch_gradients = Parameters::zeros(parameter_count);
+            std::vector<ValuePtr> subbatch_outputs;
+            std::vector<f64>      subbatch_targets;
 
-            std::mutex               mutex;
-            std::vector<std::thread> threads;
+            for (i32 epoch = 0; epoch < epochs; epoch++) {
 
-            for (size_t subbatch_start = batch_start; subbatch_start < batch_end;
-                 subbatch_start += subbatch_size) {
+                epoch_barrier.arrive_and_wait();
 
-                threads.emplace_back([&, subbatch_start] {
-                    size_t subbatch_end = std::min(subbatch_start + subbatch_size, batch_end);
+                for (size_t batch_start = 0; batch_start < positions.size();
+                     batch_start += batch_size) {
+
+                    size_t batch_end = std::min(batch_start + batch_size, positions.size());
+                    size_t current_batch_size = batch_end - batch_start;
+                    size_t subbatch_size = (current_batch_size + thread_count - 1) / thread_count;
+
+                    size_t subbatch_start = batch_start + subbatch_size * thread_idx;
+                    size_t subbatch_end   = std::min(subbatch_start + subbatch_size, batch_end);
                     size_t current_subbatch_size = subbatch_end - subbatch_start;
 
-                    std::vector<ValuePtr> subbatch_outputs;
-                    std::vector<f64>      subbatch_targets;
+                    subbatch_outputs.clear();
+                    subbatch_targets.clear();
                     subbatch_outputs.reserve(current_subbatch_size);
                     subbatch_targets.reserve(current_subbatch_size);
 
-                    Graph::get().cleanup();
                     Graph::get().copy_parameter_values(current_parameter_values);
 
                     for (size_t j = subbatch_start; j < subbatch_end; ++j) {
@@ -158,20 +164,40 @@ int main() {
                         std::lock_guard guard{mutex};
                         batch_gradients.accumulate(subbatch_gradients);
                     }
+                    batch_barrier.arrive_and_wait();
 
                     Graph::get().cleanup();
-                });
+                }
             }
+        }).detach();
+    }
 
-            for (std::thread& t : threads) {
-                t.join();
+    for (i32 epoch = 0; epoch < epochs; epoch++) {
+        // Print epoch header
+        std::cout << "Epoch " << (epoch + 1) << "/" << epochs << std::endl;
+
+        const auto epoch_start_time = time::Clock::now();
+
+        std::iota(indices.begin(), indices.end(), 0);
+        std::shuffle(indices.begin(), indices.end(), rng);
+
+        epoch_barrier.arrive_and_wait();
+
+        for (size_t batch_idx = 0, batch_start = 0; batch_start < positions.size();
+             batch_start += batch_size, ++batch_idx) {
+
+            batch_barrier.arrive_and_wait();
+
+            {
+                std::lock_guard guard{mutex};
+                optim.step(current_parameter_values, batch_gradients);
             }
-
-            optim.step(current_parameter_values, batch_gradients);
 
             // Print batch progress bar
             print_progress(batch_idx + 1, total_batches);
         }
+
+        const auto epoch_end_time = time::Clock::now();
 
         std::cout << std::endl;  // Finish progress bar line
 
@@ -273,6 +299,10 @@ int main() {
         printPsqtArray("ROOK_PSQT", ROOK_PSQT);
         printPsqtArray("QUEEN_PSQT", QUEEN_PSQT);
         printPsqtArray("KING_PSQT", KING_PSQT);
+
+        std::cout << "// Epoch duration: "
+                  << time::cast<time::FloatSeconds>(epoch_end_time - epoch_start_time).count()
+                  << "s" << std::endl;
 
         if (epoch > 5) {
             optim.set_lr(optim.get_lr() * 0.91);
