@@ -14,6 +14,7 @@
 #include <functional>
 #include <iomanip>
 #include <iostream>
+#include <mutex>
 #include <numeric>
 #include <random>
 #include <sstream>
@@ -110,7 +111,7 @@ int main() {
 
     std::mutex   mutex;
     std::barrier epoch_barrier{thread_count + 1};
-    std::barrier batch_barrier{thread_count + 1, [&] {
+    std::barrier batch_barrier{thread_count + 1, [&]() noexcept {
                                    std::lock_guard guard{mutex};
                                    optim.step(current_parameter_values, batch_gradients);
                                    batch_gradients = Parameters::zeros(parameter_count);
