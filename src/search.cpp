@@ -521,7 +521,7 @@ Value Worker::search(
                 reduction += 1024;
             }            
 
-            if (tt_data && tt_data->move.is_capture()) {
+            if (tt_data && tt_data->move.is_capture() && !m.is_capture()) {
                 reduction += 1024;
             }
 
