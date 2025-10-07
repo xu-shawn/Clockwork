@@ -1,6 +1,7 @@
 #include "search.hpp"
 #include "board.hpp"
 #include "common.hpp"
+#include "dbg_tools.hpp"
 #include "evaluation.hpp"
 #include "history.hpp"
 #include "movegen.hpp"
@@ -132,7 +133,13 @@ Worker::~Worker() {
 }
 
 bool Worker::check_tm_hard_limit() {
+    using namespace std::chrono_literals;
+
     time::TimePoint now = time::Clock::now();
+    if (now - m_last_info_time >= 1s) {
+        m_last_info_time = now;
+        dbg_print();
+    }
     if (now >= m_search_limits.hard_time_limit) {
         m_stopped = true;
         return true;
@@ -378,7 +385,7 @@ Value Worker::search(
     }
 
     auto tt_data = excluded ? std::nullopt : m_searcher.tt.probe(pos, ply);
-    bool ttpv = PV_NODE;
+    bool ttpv    = PV_NODE;
 
     if (!PV_NODE && tt_data) {
         if (tt_data->depth >= depth
@@ -444,7 +451,8 @@ Value Worker::search(
     }
 
     // Razoring
-    if (!PV_NODE && !excluded && !is_in_check && depth <= 7 && ss->static_eval + 707 * depth < alpha) {
+    if (!PV_NODE && !excluded && !is_in_check && depth <= 7
+        && ss->static_eval + 707 * depth < alpha) {
         const Value razor_score = quiesce<IS_MAIN>(pos, ss, alpha, beta, ply);
         if (razor_score <= alpha) {
             return razor_score;
@@ -466,7 +474,7 @@ Value Worker::search(
 
     // Iterate over the move list
     for (Move m = moves.next(); m != Move::none(); m = moves.next()) {
-         if (m == ss->excluded_move) {
+        if (m == ss->excluded_move) {
             continue;
         }
 
@@ -518,15 +526,15 @@ Value Worker::search(
                 // Double Extension
                 if (!PV_NODE && singular_value <= singular_beta - 40) {
                     extension = 2;
-                }                
+                }
             }
-            
+
             // Negative Extensions
             else if (tt_data->score >= beta) {
                 extension = -1;
             }
-        }        
-        
+        }
+
         // Do move
         ss->cont_hist_entry = &m_td.history.get_cont_hist_entry(pos, m);
 
@@ -659,30 +667,31 @@ Value Worker::search(
             return alpha;
         } else {
             if (pos.is_in_check()) {
-            return mated_in(ply);
+                return mated_in(ply);
             } else {
                 return 0;
             }
-        }        
+        }
     }
 
     if (!excluded) {
         Bound bound   = best_value >= beta        ? Bound::Lower
-                  : best_move != Move::none() ? Bound::Exact
-                                              : Bound::Upper;
-        Move  tt_move = best_move != Move::none() ? best_move : tt_data ? tt_data->move : Move::none();
+                      : best_move != Move::none() ? Bound::Exact
+                                                  : Bound::Upper;
+        Move  tt_move = best_move != Move::none() ? best_move
+                      : tt_data                   ? tt_data->move
+                                                  : Move::none();
         m_searcher.tt.store(pos, ply, raw_eval, tt_move, best_value, depth, ttpv, bound);
 
         // Update to correction history.
         if (!is_in_check
             && !(best_move != Move::none() && (best_move.is_capture() || best_move.is_promotion()))
             && !((bound == Bound::Lower && best_value <= ss->static_eval)
-                || (bound == Bound::Upper && best_value >= ss->static_eval))) {
+                 || (bound == Bound::Upper && best_value >= ss->static_eval))) {
             m_td.history.update_correction_history(pos, depth, best_value - raw_eval);
         }
     }
 
-    
 
     return best_value;
 }

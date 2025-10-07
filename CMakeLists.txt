@@ -62,6 +62,8 @@ set(srcs
         src/bench.cpp
         src/bench.hpp
         src/common.hpp
+        src/dbg_tools.cpp
+        src/dbg_tools.hpp
         src/evaluation.cpp
         src/evaluation.hpp
         src/eval_constants.hpp
