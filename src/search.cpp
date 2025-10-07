@@ -209,6 +209,7 @@ Move Worker::iterative_deepening(const Position& root_position) {
     std::array<Stack, MAX_PLY + SS_PADDING + 1> ss;
 
     Depth last_search_depth = 0;
+    Depth last_seldepth     = 0;
     Value last_search_score = -VALUE_INF;
     Value base_search_score = -VALUE_INF;
     Move  last_best_move    = Move::none();
@@ -229,17 +230,19 @@ Move Worker::iterative_deepening(const Position& root_position) {
         // Get current time
         auto curr_time = time::Clock::now();
 
-        std::cout << std::dec << "info depth " << last_search_depth << " score "
-                  << format_score(last_search_score) << " nodes " << m_searcher.node_count()
-                  << " nps " << time::nps(m_searcher.node_count(), curr_time - m_search_start)
-                  << " time " << time::cast<time::Milliseconds>(curr_time - m_search_start).count()
-                  << " pv " << last_pv << std::endl;
+        std::cout << std::dec << "info depth " << last_search_depth << " seldepth " << last_seldepth
+                  << " score " << format_score(last_search_score) << " nodes "
+                  << m_searcher.node_count() << " nps "
+                  << time::nps(m_searcher.node_count(), curr_time - m_search_start) << " time "
+                  << time::cast<time::Milliseconds>(curr_time - m_search_start).count() << " pv "
+                  << last_pv << std::endl;
     };
 
     m_node_counts.fill(0);
 
     for (Depth search_depth = 1; search_depth < MAX_PLY; search_depth++) {
         // Call search
+        m_seldepth  = 0;
         Value alpha = -VALUE_INF, beta = VALUE_INF;
         Value delta = 50;
         if (search_depth >= 5) {
@@ -273,6 +276,7 @@ Move Worker::iterative_deepening(const Position& root_position) {
 
         // Store information only if the last iterative deepening search completed
         last_search_depth = search_depth;
+        last_seldepth     = m_seldepth;
         last_search_score = score;
         last_pv           = ss[SS_PADDING].pv;
         last_best_move    = last_pv.first_move();
@@ -351,6 +355,9 @@ Value Worker::search(
     // TODO: search nodes limit condition here
     // ...
     increment_search_nodes();
+    if (PV_NODE) {
+        m_seldepth = std::max(ply + 1, m_seldepth);
+    }
 
     // Check for hard time limit
     // TODO: add control for being main search thread here
