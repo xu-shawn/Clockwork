@@ -303,7 +303,8 @@ Move Worker::iterative_deepening(const Position& root_position) {
                 complexity = 0.6 * abs(base_search_score - score) * std::log(search_depth);
             }
             m_search_limits.soft_time_limit = TM::compute_soft_limit<true>(
-              m_search_start, m_searcher.settings, root_position.active_color(), nodes_tm_fraction, complexity);
+              m_search_start, m_searcher.settings, root_position.active_color(), nodes_tm_fraction,
+              complexity);
         }
 
         // check soft time limit
@@ -367,15 +368,15 @@ Value Worker::search(
     if (!ROOT_NODE) {
         // Repetition check
         if (repetition_info.detect_repetition(static_cast<usize>(ply))) {
-            return 0;
+            return VALUE_DRAW;
         }
         // 50 mr check
         if (pos.get_50mr_counter() >= 100) {
-            return 0;
+            return VALUE_DRAW;
         }
         // Insufficient material check
         if (pos.is_insufficient_material()) {
-            return 0;
+            return VALUE_DRAW;
         }
     }
 
@@ -532,8 +533,8 @@ Value Worker::search(
             // Multicut
             else if (singular_beta >= beta) {
                 return singular_beta;
-            }            
-            
+            }
+
             // Negative Extensions
             else if (tt_data->score >= beta) {
                 extension = -1;
@@ -674,7 +675,7 @@ Value Worker::search(
             if (pos.is_in_check()) {
                 return mated_in(ply);
             } else {
-                return 0;
+                return VALUE_DRAW;
             }
         }
     }
@@ -724,7 +725,7 @@ Value Worker::quiesce(const Position& pos, Stack* ss, Value alpha, Value beta, i
 
     // 50 mr check
     if (pos.get_50mr_counter() >= 100) {
-        return 0;
+        return VALUE_DRAW;
     }
 
     // Return eval if we exceed the max ply.
