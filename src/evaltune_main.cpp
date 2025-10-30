@@ -233,6 +233,12 @@ int main() {
 
         std::cout << "inline const PParam POTENTIAL_CHECKER_VAL = " << POTENTIAL_CHECKER_VAL << ";"
                   << std::endl;
+
+        std::cout << "inline const PParam OUTPOST_KNIGHT_VAL = " << OUTPOST_KNIGHT_VAL << ";"
+                  << std::endl;
+        std::cout << "inline const PParam OUTPOST_BISHOP_VAL = " << OUTPOST_BISHOP_VAL << ";"
+                  << std::endl;
+
         std::cout << std::endl;
 
         auto print_table = [](const std::string& name, const auto& table) {
