@@ -415,6 +415,10 @@ Value Worker::search(
             && (tt_data->bound() == Bound::Exact
                 || (tt_data->bound() == Bound::Lower && tt_data->score >= beta)
                 || (tt_data->bound() == Bound::Upper && tt_data->score <= alpha))) {
+            if (depth <= 7) {
+                return tt_data->score;
+            }
+
             if (tt_data->move == Move::none()) {
                 return tt_data->score;
             }
