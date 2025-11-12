@@ -425,20 +425,18 @@ Value Worker::search(
 
             MoveGen movegen{pos};
 
-            if (!movegen.is_legal(tt_data->move)) {
-                return tt_data->score;
-            }
+            if (movegen.is_legal(tt_data->move)) {
+                Position pos_after     = pos.move(tt_data->move, m_td.push_psqt_state());
+                auto     tt_data_after = m_searcher.tt.probe(pos_after, ply);
+                m_td.pop_psqt_state();
 
-            Position pos_after     = pos.move(tt_data->move, m_td.push_psqt_state());
-            auto     tt_data_after = m_searcher.tt.probe(pos_after, ply);
-            m_td.pop_psqt_state();
+                if (!tt_data_after) {
+                    return tt_data->score;
+                }
 
-            if (!tt_data_after) {
-                return tt_data->score;
-            }
-
-            if ((tt_data->score >= beta) == (tt_data_after->score <= -beta)) {
-                return tt_data->score;
+                if ((tt_data->score >= beta) == (tt_data_after->score <= -beta)) {
+                    return tt_data->score;
+                }
             }
         }
 
