@@ -467,8 +467,8 @@ PScore evaluate_threats(const Position& pos, const EvalData& data) {
     opp_pawn     = pos.bitboard_for(opp, PieceType::Pawn);
     opp_non_pawn = pos.board().get_color_bitboard(opp) & ~opp_pawn;
 
-    strongly_protected =
-      data.attacked_by(opp, PieceType::Pawn) | (data.attacked_by_2(opp) & ~data.attacked_by_2(opp));
+    strongly_protected = data.attacked_by(opp, PieceType::Pawn)
+                       | (data.attacked_by_2(opp) & ~data.attacked_by_2(color));
 
     defended = opp_non_pawn & strongly_protected;
 
