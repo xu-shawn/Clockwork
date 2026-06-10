@@ -13,13 +13,16 @@ namespace Clockwork {
 
 
 struct EvalData {
-    i32 m_piece_count[2][6];
-    i32 wcount = 0;
-    i32 bcount = 0;
 
     Bitboard any_attacks_by[2];
     Bitboard any2_attacks_by[2];
     Bitboard attacks_by_pt[2][7];
+
+    Bitboard mobility_area[2];
+
+    i32 m_piece_count[2][6];
+    i32 wcount = 0;
+    i32 bcount = 0;
 
     void init(const Position& pos) {
         any_attacks_by[0]  = pos.attack_table(Color::White).get_attacked_bitboard();
@@ -148,6 +151,16 @@ std::array<Bitboard, 64> extended_ring_table = []() {
 }();
 
 
+std::array<Bitboard, 64> orthogonal_squares_table = []() {
+    std::array<Bitboard, 64> orthogonal_squares_table{};
+    for (u8 sq_idx = 0; sq_idx < 64; sq_idx++) {
+        Square sq = Square{sq_idx};
+        orthogonal_squares_table[sq_idx] =
+          Bitboard::file_mask(sq.file()) | Bitboard::rank_mask(sq.rank());
+    }
+    return orthogonal_squares_table;
+}();
+
 std::array<Bitboard, 64> diagonal_squares_table = []() {
     std::array<Bitboard, 64> diagonal_squares_table{};
     for (u8 sq_idx = 0; sq_idx < 64; sq_idx++) {
@@ -163,6 +176,23 @@ std::array<Bitboard, 64> diagonal_squares_table = []() {
         }
     }
     return diagonal_squares_table;
+}();
+
+std::array<Bitboard, 64> knight_squares_table = []() {
+    std::array<Bitboard, 64> knight_squares_table{};
+    for (u8 sq_idx = 0; sq_idx < 64; sq_idx++) {
+        Square   sq                  = Square{sq_idx};
+        Bitboard sqb                 = Bitboard::from_square(sq);
+        knight_squares_table[sq_idx] = sqb.shift(Direction::North).shift(Direction::NorthEast)
+                                     | sqb.shift(Direction::North).shift(Direction::NorthWest)
+                                     | sqb.shift(Direction::South).shift(Direction::SouthEast)
+                                     | sqb.shift(Direction::South).shift(Direction::SouthWest)
+                                     | sqb.shift(Direction::West).shift(Direction::NorthWest)
+                                     | sqb.shift(Direction::West).shift(Direction::SouthWest)
+                                     | sqb.shift(Direction::East).shift(Direction::NorthEast)
+                                     | sqb.shift(Direction::East).shift(Direction::SouthEast);
+    }
+    return knight_squares_table;
 }();
 
 std::array<std::array<Bitboard, 64>, 2> passed_pawn_spans = []() {
@@ -309,7 +339,7 @@ PScore evaluate_pawn_push_threats(const Position& pos) {
 }
 
 template<Color color>
-PScore evaluate_pieces(const Position& pos, const EvalData& data) {
+PScore evaluate_pieces(const Position& pos, EvalData& data) {
     constexpr Color opp       = ~color;
     PScore          eval      = PSCORE_ZERO;
     Bitboard        own_pawns = pos.bitboard_for(color, PieceType::Pawn);
@@ -319,8 +349,9 @@ PScore evaluate_pieces(const Position& pos, const EvalData& data) {
                                          ? Bitboard::rank_mask(1) | Bitboard::rank_mask(2)
                                          : Bitboard::rank_mask(5) | Bitboard::rank_mask(6);
     Bitboard           own_early_pawns = own_pawns & early_ranks;
-    Bitboard bb  = (blocked_pawns | own_early_pawns) | data.attacked_by(opp, PieceType::Pawn);
-    Bitboard bb2 = bb;
+    Bitboard bb = (blocked_pawns | own_early_pawns) | data.attacked_by(opp, PieceType::Pawn);
+    data.mobility_area[static_cast<usize>(color)] = ~bb;
+    Bitboard bb2                                  = bb;
     for (PieceId id : pos.get_piece_mask(color, PieceType::Knight)) {
         eval += KNIGHT_MOBILITY[pos.mobility_of(color, id, ~bb)];
     }
@@ -510,6 +541,36 @@ PScore evaluate_threats(const Position& pos, const EvalData& data) {
     eval += PAWN_THREAT_ROOK * (pos.bitboard_for(opp, PieceType::Rook) & pawn_attacks).ipopcount();
     eval +=
       PAWN_THREAT_QUEEN * (pos.bitboard_for(opp, PieceType::Queen) & pawn_attacks).ipopcount();
+
+    // Our attacks on enemy queen
+    if (data.piece_count(opp, PieceType::Queen) == 1) {
+
+        Bitboard opp_queens = pos.bitboard_for(opp, PieceType::Queen);
+
+        bool queen_imbalance = data.piece_count(color, PieceType::Queen) == 0;
+
+        Square   sq   = opp_queens.lsb();
+        Bitboard safe = data.mobility_area[static_cast<usize>(color)]
+                      & ~pos.bitboard_for(color, PieceType::Pawn) & ~strongly_protected;
+
+
+        b = knight_squares_table[sq.raw] & data.attacked_by(color, PieceType::Knight) & safe;
+        eval += KNIGHT_ON_QUEEN[queen_imbalance] * b.ipopcount();
+
+        safe &= data.attacked_by_2(color);
+
+        Bitboard attacks = data.attacked_by(opp, PieceType::Queen);
+
+        Bitboard a = attacks & diagonal_squares_table[sq.raw];
+
+        b = a & data.attacked_by(color, PieceType::Bishop) & safe;
+        eval += BISHOP_ON_QUEEN[queen_imbalance] * b.ipopcount();
+
+        a = attacks ^ a;
+
+        b = a & data.attacked_by(color, PieceType::Rook) & safe;
+        eval += ROOK_ON_QUEEN[queen_imbalance] * b.ipopcount();
+    }
 
     return eval;
 }
