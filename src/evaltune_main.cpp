@@ -39,8 +39,8 @@ int main() {
     std::vector<f64>      results;
 
     const std::vector<std::string> fenFiles = {
-      "data/v5_25knpm.txt",  "data/v4_8knpm.txt",    "data/v4_16knpm.txt",
-      "data/v4.1_8knpm.txt", "data/v4.1_16knpm.txt", "data/dfrcv2.txt",
+      "data/v5_25knpm.relabel.txt",  "data/v4_8knpm.relabel.txt",    "data/v4_16knpm.relabel.txt",
+      "data/v4.1_8knpm.relabel.txt", "data/v4.1_16knpm.relabel.txt", "data/dfrcv2.relabel.txt",
     };
 
     const u32 thread_count = std::max<u32>(1, std::thread::hardware_concurrency());
@@ -130,14 +130,15 @@ int main() {
                     result.erase(std::remove_if(result.begin(), result.end(), ::isspace),
                                  result.end());
 
-                    f64 r;
-                    if (result == "w") {
-                        r = 1.0;
-                    } else if (result == "d") {
-                        r = 0.5;
-                    } else if (result == "b") {
-                        r = 0.0;
-                    } else {
+                    f64    r;
+                    size_t consumed = 0;
+                    try {
+                        r = std::stod(result, &consumed);
+                    } catch (const std::exception&) {
+                        std::cerr << "Invalid result in " << filename << ": " << line << "\n";
+                        continue;
+                    }
+                    if (consumed != result.size() || r < 0.0 || r > 1.0) {
                         std::cerr << "Invalid result in " << filename << ": " << line << "\n";
                         continue;
                     }
